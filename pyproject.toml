@@ -1,0 +1,43 @@
+[project]
+name = "demanda"
+version = "0.1.0"
+description = "Pronóstico de demanda para reposición en retail, con experimento de promociones, monitor de drift y una capa de agentes que interpreta los resultados."
+readme = "README.md"
+authors = [
+    { name = "javier-laguna", email = "67978779+javier-laguna@users.noreply.github.com" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "pydantic-settings>=2.6",
+]
+
+[project.scripts]
+demanda = "demanda.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # el código y la documentación están en español (acentos, «·»)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.pyrefly]
+project-includes = ["src", "tests"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7.0",
+    "pyrefly>=1.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]

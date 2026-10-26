@@ -1,0 +1,14 @@
+.git
+.venv
+.archify
+.claude
+Prueba_Tecnica_DS
+*.zip
+data/raw
+data/interim
+artifacts
+reports
+.env
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache

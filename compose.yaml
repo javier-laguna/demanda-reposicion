@@ -1,0 +1,12 @@
+name: demanda-reposicion
+
+services:
+  demanda:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+    env_file:
+      - path: .env
+        required: false
+    command: ["data"]

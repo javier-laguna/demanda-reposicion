@@ -1,0 +1,39 @@
+# Datos de la prueba: nunca se versionan (solo data/manifest.sha256)
+Prueba_Tecnica_DS/
+Prueba_Tecnica_DS*.zip
+data/*
+!data/manifest.sha256
+*.csv
+*.parquet
+*.zip
+
+# Generados por el pipeline
+artifacts/
+reports/
+mlruns/
+mlflow.db
+
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Ambientes y cachés
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+__marimo__/
+
+# Recibos de archify (rutas absolutas locales); se versionan candidate.json y el HTML
+.archify/**/*.finalize*.json
+.archify/**/*.browser-check.json
+.archify/**/*.delivery.json
+.archify/**/visual-check/
+.archify/**/review-*/
+
+# Claude Code: configuración local
+.claude/settings.local.json
+
+.DS_Store

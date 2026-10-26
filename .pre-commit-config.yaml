@@ -1,0 +1,44 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      # Los HTML de archify son generados y llevan hash de procedencia: no se reescriben
+      - id: end-of-file-fixer
+        exclude: ^\.archify/
+      - id: trailing-whitespace
+        exclude: ^\.archify/
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  # ruff y pyrefly corren desde el ambiente de uv para usar las mismas versiones que uv.lock
+  - repo: local
+    hooks:
+      - id: sin-datos
+        name: bloquear archivos de datos
+        language: fail
+        entry: "Los datos no se versionan; colócalos con `make data`"
+        files: '\.(csv|parquet|zip)$'
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: uv run ruff check --fix
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        language: system
+        entry: uv run ruff format
+        types_or: [python, pyi]
+      - id: pyrefly
+        name: pyrefly
+        language: system
+        entry: uv run pyrefly check
+        pass_filenames: false
+        types: [python]
