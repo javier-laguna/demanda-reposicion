@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad eda lint format types test validate docker-build up
+.PHONY: help setup data calidad eda backtest lint format types test validate docker-build up
 
 DATA_SRC ?=
 
@@ -18,6 +18,9 @@ calidad:  ## valida contratos y escribe data/interim/panel.parquet y artifacts/c
 
 eda:  ## corre el notebook de EDA: reports/eda.html y artifacts/eda/resumen.json
 	uv run demanda eda
+
+backtest:  ## backtest de origen rodante: artifacts/backtest/ y un run de MLflow por modelo
+	uv run demanda backtest
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

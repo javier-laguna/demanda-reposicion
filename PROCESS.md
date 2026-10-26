@@ -119,3 +119,44 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
 - **Decisión:** el efecto de Navidad queda reportado con sus dos lecturas (×1.09 sobre el mes, ~×1.3 sin controlarlo)
   en vez de elegir una. Con un solo diciembre los datos no permiten separarlas, y el modelo usa mes y nivel reciente
   como features en lugar de depender de ese multiplicador.
+
+### E3 · Features, backtest y baselines
+
+- **Qué se hizo:**
+  - un protocolo con 17 cortes semanales que cubren Buen Fin, Navidad y enero–febrero;
+  - cuatro baselines: el sistema actual sin fuga, naive estacional, MA7 y AutoETS;
+  - métricas semanales y diarias por segmento;
+  - la conciliación con E2;
+  - MLflow local;
+  - la matriz de features que usará E4.
+- **Decisiones de diseño de la spec:**
+  - **El futuro se separa por construcción.** Cada modelo recibe solo la historia hasta T y lo que se conoce de
+    antemano, así no depende de que cada modelo "se porte bien". Encima de eso, una prueba altera el futuro y exige
+    el mismo pronóstico. Se aplica a todo modelo registrado, incluidos los de E4.
+  - **La métrica principal es la suma semanal.** Es la granularidad de la reposición y la única en la que el sistema
+    actual, que es una media de 7 días, compite sin desventaja. Medido por día, su perfil plano lo castigaría
+    (45.7 %), y la comparación sería injusta a favor de los modelos nuevos.
+  - **17 cortes en lugar de los ~8 del plan,** porque es lo que cabe con frecuencia semanal en ese periodo, y más
+    cortes dan más potencia a las pruebas de E4.
+- **Cómo se usó la IA:**
+  - Claude Code escribió la spec a partir del plan aprobado, con las decisiones de arriba. Antes midió el tiempo de
+    AutoETS en un corte (~12 s) para fijar el presupuesto de la etapa.
+  - La implementación la hizo un agente general con las instrucciones de `.claude/agents/forecast-engineer.md`. El
+    subagente registrado seguía sin estar disponible, por la misma razón que en E2.
+  - Las cifras se verificaron sin usar el código del agente. Los tres baselines cerrados se recalcularon con un
+    script aparte y coinciden al centésimo; AutoETS se reajustó por separado en un corte.
+  - La revisión del diff la hizo otro agente general, con las instrucciones de `reviewer`. No encontró fugas, pero
+    sí defectos reales, y se corrigieron todos:
+    - `MLFLOW_TRACKING_URI` del shell podía mandar los runs a un servidor remoto;
+    - un modelo con pronósticos nulos podía sacar puntos de su propio denominador;
+    - las métricas por segmento no tenían ninguna prueba contra valores calculados a mano.
+
+    La revisión lo comprobó con mutaciones: el código roto seguía pasando las pruebas. Tras corregirlo, cinco de
+    seis mutaciones fallan.
+- **Qué cambió al ver la primera corrida:**
+  - En la tabla por corte, la semana siguiente al Buen Fin tenía ~100 % de error y caía en "resto". Eso hacía parecer
+    que AutoETS ganaba en general.
+  - Se agregó el nivel `post_buen_fin`. Con él se ve que en semanas normales el sistema actual es el mejor modelo
+    (11.0 %, contra 13.4 % de AutoETS), y que su falla está en los picos y en la semana que sigue.
+  - Ese hallazgo cambia lo que E4 tiene que demostrar: no basta con ganar en el global; también hay que no perder en
+    las semanas normales.

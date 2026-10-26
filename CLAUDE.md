@@ -30,6 +30,8 @@ make data DATA_SRC="<zip o carpeta>" # copia los 3 CSV a data/raw/ y verifica da
 make data                           # solo verifica los hashes de data/raw/
 make calidad                        # contratos + data/interim/panel.parquet + artifacts/calidad/reporte.json
 make eda                            # notebook marimo → reports/eda.html + artifacts/eda/resumen.json
+make backtest                       # 17 cortes × modelos → artifacts/backtest/ + un run de MLflow por modelo (~3 min)
+uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
 uv run demanda --help               # CLI del pipeline; cada etapa agrega su comando
@@ -71,7 +73,7 @@ que las usa.
   valores fechados en T−1 o antes.** Sus nulos están en **2023-01-01 y 2023-01-02**, no "en los últimos días" como
   dice el diccionario. Con el protocolo de la exploración (suma de T+1 a T+7, orígenes desde 2023-07-01), el WAPE
   del sistema actual es 18.6 % con la señal de T y **20.1 % con la de T−1**, contra 21.6 % de la MA7. En las
-  semanas con Buen Fin llega a 44 %. El backtest formal es de E3.
+  semanas con Buen Fin llega a 44 %. Los resultados del backtest de E3 están en «Backtest y modelos».
 - **Conteos inconsistentes en ~20 % de las filas**, uniformes por tienda, categoría y mes:
   `cash_transactions + card_transactions < total_transactions`, y en esas filas
   `avg_ticket = amount_total / (cash + card)`, que sobreestima el ticket real en ~22 %. Los montos sí cuadran:
@@ -105,3 +107,22 @@ que las usa.
   diciembre solo una.
 - Por los nulos de `units_sold`, solo el 81 % de los orígenes tiene los 7 días siguientes completos. Si se evalúa la
   suma semanal, hay que reportar la cobertura; los errores diarios no pierden esos orígenes.
+
+## Backtest y modelos
+
+- **Protocolo** (`src/demanda/backtest/protocolo.py`):
+  - 17 orígenes semanales, los jueves del 2023-11-02 al 2024-02-22, con h = 1..7;
+  - `separar` le da a cada modelo solo dos tablas: `historia`, con fecha ≤ T y la señal de T en nulo, y `futuro`,
+    con las columnas `CONOCIDAS` (calendario, tienda y `has_promotion`).
+- **Modelos:** un modelo nuevo se registra en `src/demanda/modelos/` con `registrar(nombre, fábrica)`. Con eso entra
+  al backtest y a la prueba de fugas de `tests/test_modelos.py`, que altera el futuro y exige el mismo pronóstico.
+  La matriz de features para E4 está en `src/demanda/features/matriz.py`.
+- **Métrica principal:** el WAPE de la suma semanal por serie y corte, solo con los pares que tienen los 7 días
+  observados (80.5 %). Lo diario es diagnóstico. Hay un nivel de evento `post_buen_fin` para la semana siguiente
+  al Buen Fin, así `resto` son las semanas normales.
+- **La vara de E3:**
+  - el sistema actual tiene un WAPE semanal de 27.3 % en los 17 cortes y de **11.0 % en semanas normales**, donde es
+    el mejor baseline;
+  - falla en el Buen Fin (sesgo de −50 %), en la semana siguiente (+101 %, porque su señal promedia el pico) y en
+    fin de año;
+  - AutoETS da 24.7 % en el global, pero 13.4 % en semanas normales.

@@ -53,6 +53,58 @@ def _eda(args: argparse.Namespace) -> None:
     print(f"escrito: {salida} y {cfg.artifacts_dir / 'eda' / 'resumen.json'}")
 
 
+def _pct(x: float | None, signo: bool = False) -> str:
+    return "—" if x is None else f"{x:{'+' if signo else ''}.2f} %"
+
+
+def _backtest(args: argparse.Namespace) -> None:
+    # statsforecast y MLflow tardan en importarse: solo los carga este comando
+    from demanda.backtest import etapa
+
+    cfg = get_config()
+    panel_path = cfg.interim_dir / "panel.parquet"
+    reporte_path = cfg.artifacts_dir / "calidad" / "reporte.json"
+    for ruta in (panel_path, reporte_path):
+        if not ruta.exists():
+            raise FileNotFoundError(f"no existe {ruta}; corre antes `demanda calidad`")
+    salida = cfg.artifacts_dir / "backtest"
+    r = etapa.ejecutar(
+        panel_path,
+        reporte_path,
+        cfg.artifacts_dir / "eda" / "resumen.json",
+        salida,
+        cfg.mlflow_tracking_uri,
+        cfg.mlruns_dir,
+        n_jobs=-1,
+        progreso=lambda mensaje: print(mensaje, file=sys.stderr),
+    )
+    c = r.metricas["conciliacion_e2"]
+    print(
+        f"conciliación con E2: sistema actual {_pct(c['wape_pct'])} contra {_pct(c['referencia_e2_pct'])} "
+        f"(diferencia {'—' if c['diferencia_pp'] is None else c['diferencia_pp']} pp, "
+        f"{c['origenes_evaluados']:,} orígenes)"
+    )
+    s = r.metricas["cobertura"]["semanal"]
+    print(
+        f"cobertura semanal: {s['pares_completos']:,} de {s['pares_total']:,} pares completos ({s['pct']} %)"
+    )
+    columnas = ("WAPE sem", "sesgo sem", "WAPE día", "MASE", "pinball", "cob 80")
+    print(f"{'modelo':<18}" + "".join(f"{c:>11}" for c in columnas))
+    for modelo, g in r.globales.items():
+        mase = g.get("diaria_mase")
+        celdas = (
+            _pct(g.get("semanal_wape_pct")),
+            _pct(g.get("semanal_sesgo_pct"), signo=True),
+            _pct(g.get("diaria_wape_pct")),
+            "—" if mase is None else f"{mase:.3f}",
+            _pct(g.get("diaria_pinball_medio_pct")),
+            _pct(g.get("diaria_cobertura_80_pct")),
+        )
+        print(f"{modelo:<18}" + "".join(f"{c:>11}" for c in celdas))
+    print(f"escrito: {salida / 'pronosticos.parquet'} y {salida / 'metricas.json'}")
+    print(f"MLflow: {cfg.mlflow_tracking_uri}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="demanda")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -66,6 +118,9 @@ def main(argv: list[str] | None = None) -> None:
 
     p_eda = sub.add_parser("eda", help="corre el notebook de EDA: reporte HTML y resumen para los agentes")
     p_eda.set_defaults(func=_eda)
+
+    p_backtest = sub.add_parser("backtest", help="backtest de origen rodante: pronósticos, métricas y MLflow")
+    p_backtest.set_defaults(func=_backtest)
 
     args = parser.parse_args(argv)
     try:

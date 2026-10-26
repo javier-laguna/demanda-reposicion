@@ -8,7 +8,7 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | [E0](E0.md) | Base del repo y gobierno | cerrada |
 | [E1](E1.md) | Datos: contratos y calidad | cerrada |
 | [E2](E2.md) | EDA reproducible (marimo) | cerrada |
-| E3 | Features, backtest y baselines | pendiente |
+| [E3](E3.md) | Features, backtest y baselines | cerrada |
 | E4 | Modelos (LightGBM, Chronos-2) y validación robusta | pendiente |
 | E5 | Monitor de drift y reglas de decisión | pendiente |
 | E6 | Experimento de promociones | pendiente |

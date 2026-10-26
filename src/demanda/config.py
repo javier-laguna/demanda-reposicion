@@ -1,12 +1,17 @@
-"""Configuración del proyecto: rutas y proveedor LLM, leídos de variables de entorno o de `.env`."""
+"""Configuración del proyecto: rutas, MLflow y proveedor LLM, leídos de variables de entorno o de `.env`."""
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RAIZ = Path(__file__).resolve().parents[2]
+
+
+def _mlflow_por_defecto(campos: dict[str, Any]) -> str:
+    return f"sqlite:///{Path(campos['artifacts_dir']).resolve() / 'mlflow.db'}"
 
 
 class Config(BaseSettings):
@@ -15,6 +20,12 @@ class Config(BaseSettings):
     data_dir: Path = RAIZ / "data"
     artifacts_dir: Path = RAIZ / "artifacts"
     reports_dir: Path = RAIZ / "reports"
+    # Por defecto vive junto a los artefactos, así nada del backtest se escribe fuera de `artifacts_dir`.
+    # Se lee de una variable propia: la estándar, `MLFLOW_TRACKING_URI`, puede apuntar a un servidor
+    # remoto en el shell
+    mlflow_tracking_uri: str = Field(
+        default_factory=_mlflow_por_defecto, validation_alias="DEMANDA_MLFLOW_TRACKING_URI"
+    )
 
     # Capa de agentes. `llm_model` usa la notación de Pydantic AI (`proveedor:modelo`). Sin key se usa la
     # caché de insights o, si no coincide, las plantillas.
@@ -30,6 +41,11 @@ class Config(BaseSettings):
     @property
     def interim_dir(self) -> Path:
         return self.data_dir / "interim"
+
+    @property
+    def mlruns_dir(self) -> Path:
+        """Donde MLflow guarda los artefactos de cada run."""
+        return self.artifacts_dir / "mlruns"
 
 
 @lru_cache

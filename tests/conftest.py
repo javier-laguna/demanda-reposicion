@@ -7,6 +7,8 @@ import numpy as np
 import polars as pl
 import pytest
 
+from demanda.backtest.protocolo import CONOCIDAS, DE_LA_SENAL
+from demanda.datos import panel
 from demanda.datos.contratos import FORMATOS, NSE, REGIONES, SERIE, Tablas
 
 INICIO = date(2023, 1, 1)
@@ -127,3 +129,28 @@ def generar_tablas():
 def carpeta_csv(tmp_path: Path):
     """Escribe unas tablas como CSV en una carpeta temporal y devuelve la carpeta."""
     return lambda tablas: escribir_csv(tablas, tmp_path / "raw")
+
+
+def alterar_futuro(p: pl.DataFrame, origen: date) -> pl.DataFrame:
+    """Cambia, después de `origen`, todas las columnas que no se conocen de antemano, y también la señal y su
+    bandera fechadas en `origen`. Un pronóstico o una feature sin fugas no debe moverse."""
+    despues = pl.col("date") > origen
+
+    def alterar(columna: str) -> pl.Expr:
+        nuevo = ~pl.col(columna) if p.schema[columna] == pl.Boolean else pl.col(columna).fill_null(0) * 3 + 7
+        cuando = despues | (pl.col("date") == origen) if columna in DE_LA_SENAL else despues
+        return pl.when(cuando).then(nuevo).otherwise(pl.col(columna)).alias(columna)
+
+    return p.with_columns(alterar(c) for c in p.columns if c not in CONOCIDAS)
+
+
+@pytest.fixture(scope="session")
+def panel_sintetico() -> pl.DataFrame:
+    """Panel de 70 días: alcanza para dos cortes semanales con ocho semanas de historia."""
+    return panel.construir(generar(dias=70))
+
+
+@pytest.fixture(scope="session")
+def alterador():
+    """La función `alterar_futuro`, para las pruebas de fugas."""
+    return alterar_futuro

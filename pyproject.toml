@@ -10,11 +10,13 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "altair>=6.3.0",
     "marimo>=0.25.2",
+    "mlflow>=3.17.2",
     "numpy>=2.5.4",
     "pandera[polars]>=0.35.0",
     "polars>=2.1.0",
-    "pyarrow>=26.0.0",
+    "pyarrow>=25.0.1",
     "pydantic-settings>=2.6",
+    "statsforecast>=2.1.1",
 ]
 
 [project.scripts]
@@ -36,6 +38,8 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # el código y la documentación están
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# Viene del store SQLite de MLflow, no de este código
+filterwarnings = ["ignore:The ``noload`` loader strategy is deprecated:DeprecationWarning"]
 
 [tool.pyrefly]
 project-includes = ["src", "tests"]
