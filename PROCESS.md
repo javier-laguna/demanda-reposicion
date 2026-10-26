@@ -97,3 +97,25 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
   WAPE del sistema actual medido en la exploración era optimista.
 - **Decisión:** el panel incluye las filas faltantes, con medidas nulas y una bandera, en vez de omitirlas. Así los
   lags por `shift` corresponden a días de calendario y el backtest sabe qué fechas no evaluar.
+
+### E2 · EDA reproducible
+
+- **Qué se hizo:**
+  - notebook marimo con seis secciones, exportado sin interfaz con `make eda`;
+  - `artifacts/eda/resumen.json` con las cifras clave y su definición, para los agentes de E7;
+  - una prueba de humo que corre el notebook sobre datos sintéticos.
+- **Cómo se usó la IA:**
+  - El notebook lo escribió un subagente con las instrucciones de `.claude/agents/eda-analyst.md`. No se invocó como
+    subagente registrado, porque Claude Code carga esos archivos al iniciar la sesión y se habían creado después; se
+    usó un agente general con el mismo prompt.
+  - Claude Code recalculó las cifras centrales con un script independiente antes de aceptarlas. Coinciden al centésimo.
+- **Qué corrigió el EDA:**
+  - El sistema actual sin fuga tiene un WAPE de 20.1 %, no 18.6 %, y le gana a una media móvil de 7 días por solo
+    1.5 pp. Esa es la vara honesta para los modelos.
+  - Tres cifras de la exploración no resistieron un método más cuidadoso, y `CLAUDE.md` se corrigió:
+    - el efecto de Navidad;
+    - el lift de Bebidas;
+    - "2024-01-01 en todas las tiendas".
+- **Decisión:** el efecto de Navidad queda reportado con sus dos lecturas (×1.09 sobre el mes, ~×1.3 sin controlarlo)
+  en vez de elegir una. Con un solo diciembre los datos no permiten separarlas, y el modelo usa mes y nivel reciente
+  como features en lugar de depender de ese multiplicador.

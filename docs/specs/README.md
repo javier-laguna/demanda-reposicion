@@ -7,7 +7,7 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 |---|---|---|
 | [E0](E0.md) | Base del repo y gobierno | cerrada |
 | [E1](E1.md) | Datos: contratos y calidad | cerrada |
-| E2 | EDA reproducible (marimo) | pendiente |
+| [E2](E2.md) | EDA reproducible (marimo) | cerrada |
 | E3 | Features, backtest y baselines | pendiente |
 | E4 | Modelos (LightGBM, Chronos-2) y validación robusta | pendiente |
 | E5 | Monitor de drift y reglas de decisión | pendiente |
@@ -20,6 +20,15 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 Las specs de E2 en adelante se escriben al empezar cada etapa, a partir del plan.
 El mínimo entregable es E0–E6 más E9. Si hay atraso, se recorta en este orden: Chronos-2 en todos los cortes →
 heterogeneidad causal → páginas secundarias del tablero → exponer el MCP a clientes externos.
+
+## Acuerdos para etapas siguientes
+
+Se incorporan a la spec de su etapa cuando se escriba.
+
+- **E7:** el servidor MCP expone también `get_eda_summary`, que lee `artifacts/eda/resumen.json` para el agente
+  de datos.
+- **E9:** el README aclara que `.claude/` es opcional. Son los subagentes de desarrollo, solo funcionan en Claude
+  Code y quedan como evidencia del proceso; reproducir la solución solo requiere uv/make o Docker.
 
 ## Protocolo de cierre de etapa
 

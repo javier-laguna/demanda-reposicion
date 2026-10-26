@@ -13,6 +13,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-dev --no-install-project
 
 COPY src ./src
+COPY notebooks ./notebooks
 COPY data/manifest.sha256 ./data/manifest.sha256
 RUN uv sync --locked --no-dev
 

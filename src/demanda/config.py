@@ -14,6 +14,7 @@ class Config(BaseSettings):
 
     data_dir: Path = RAIZ / "data"
     artifacts_dir: Path = RAIZ / "artifacts"
+    reports_dir: Path = RAIZ / "reports"
 
     # Capa de agentes. `llm_model` usa la notación de Pydantic AI (`proveedor:modelo`). Sin key se usa la
     # caché de insights o, si no coincide, las plantillas.

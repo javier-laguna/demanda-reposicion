@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad lint format types test validate docker-build up
+.PHONY: help setup data calidad eda lint format types test validate docker-build up
 
 DATA_SRC ?=
 
@@ -15,6 +15,9 @@ data:  ## copia los CSV a data/raw/ (DATA_SRC=carpeta o zip) y verifica sus hash
 
 calidad:  ## valida contratos y escribe data/interim/panel.parquet y artifacts/calidad/reporte.json
 	uv run demanda calidad
+
+eda:  ## corre el notebook de EDA: reports/eda.html y artifacts/eda/resumen.json
+	uv run demanda eda
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

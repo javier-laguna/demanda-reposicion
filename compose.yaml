@@ -6,6 +6,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./artifacts:/app/artifacts
+      - ./reports:/app/reports
     env_file:
       - path: .env
         required: false
