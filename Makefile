@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data lint format types test validate docker-build up
+.PHONY: help setup data calidad lint format types test validate docker-build up
 
 DATA_SRC ?=
 
@@ -12,6 +12,9 @@ setup:  ## crea el ambiente con uv e instala los hooks de pre-commit
 
 data:  ## copia los CSV a data/raw/ (DATA_SRC=carpeta o zip) y verifica sus hashes
 	uv run demanda data $(if $(DATA_SRC),--src "$(DATA_SRC)")
+
+calidad:  ## valida contratos y escribe data/interim/panel.parquet y artifacts/calidad/reporte.json
+	uv run demanda calidad
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

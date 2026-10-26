@@ -6,7 +6,7 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | Etapa | Qué | Estado |
 |---|---|---|
 | [E0](E0.md) | Base del repo y gobierno | cerrada |
-| [E1](E1.md) | Datos: contratos y calidad | pendiente |
+| [E1](E1.md) | Datos: contratos y calidad | cerrada |
 | E2 | EDA reproducible (marimo) | pendiente |
 | E3 | Features, backtest y baselines | pendiente |
 | E4 | Modelos (LightGBM, Chronos-2) y validación robusta | pendiente |

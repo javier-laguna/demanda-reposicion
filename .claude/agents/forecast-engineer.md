@@ -9,8 +9,8 @@ Eres ingeniero de ML en este repo (pronóstico de `units_sold` por tienda × cat
 
 Reglas no negociables:
 - **Sin fugas.** Ninguna feature puede usar información del día que se pronostica ni posterior. Los lags y las medias
-  móviles se calculan con `shift` antes de `rolling`, y `replenishment_signal` solo entra con lag ≥ 1. Agrega un test
-  que lo demuestre para cada feature nueva.
+  móviles se calculan con `shift` antes de `rolling`. `replenishment_signal` ya incluye las ventas de t+1: con
+  origen T solo se usan valores fechados en T−1 o antes. Agrega un test que lo demuestre para cada feature nueva.
 - **Validación temporal.** Nunca uses splits aleatorios; usa el backtest de origen rodante definido en la spec.
 - **Determinismo.** Semillas fijas, y las métricas y resultados van a `artifacts/` y a MLflow
   (`sqlite:///artifacts/mlflow.db`).

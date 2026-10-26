@@ -10,7 +10,7 @@ demanda. No modificas archivos. Antes de revisar, lee `CLAUDE.md` y la spec de l
 Busca, en este orden:
 1. **Datos o secretos que entrarían a git:** CSV, parquet, zip, `.env`, keys, rutas locales o nombres de terceros.
 2. **Fugas en features o en la evaluación:** información del día pronosticado o posterior, splits no temporales,
-   `replenishment_signal` sin lag.
+   valores de `replenishment_signal` fechados después de T−1 (con origen T; la señal ya incluye ventas de t+1).
 3. **Reproducibilidad:** semillas, dependencias fuera de `uv.lock`, rutas absolutas, pasos que no estén en el
    Makefile.
 4. **Que se cumplan los criterios de aceptación de la spec.**

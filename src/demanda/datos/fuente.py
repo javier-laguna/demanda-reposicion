@@ -9,7 +9,12 @@ import shutil
 import zipfile
 from pathlib import Path
 
+import polars as pl
+
+from demanda.datos.contratos import ESQUEMAS, Tablas
+
 ARCHIVOS = ("calendar.csv", "stores.csv", "transactions.csv")
+_ARCHIVO_DE = {"transacciones": "transactions.csv", "tiendas": "stores.csv", "calendario": "calendar.csv"}
 
 
 def leer_manifiesto(ruta: Path) -> dict[str, str]:
@@ -71,3 +76,12 @@ def verificar(carpeta: Path, manifiesto: Path) -> dict[str, str]:
         if obtenidos[nombre] != esperados.get(nombre):
             raise ValueError(f"{nombre} no coincide con el manifiesto: no es el archivo original")
     return obtenidos
+
+
+def leer(carpeta: Path) -> Tablas:
+    """Lee los CSV con los tipos del contrato. No valida reglas: eso lo hace `contratos.validar`."""
+    tablas = {}
+    for nombre, esquema in ESQUEMAS.items():
+        tipos = {columna: c.dtype.type for columna, c in esquema.columns.items()}
+        tablas[nombre] = pl.read_csv(carpeta / _ARCHIVO_DE[nombre], schema_overrides=tipos)
+    return Tablas(**tablas)

@@ -78,3 +78,22 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
   - specs por etapa.
 - **Decisión:** los datos de la prueba no se suben al repo. Quien lo reproduzca los coloca con
   `make data DATA_SRC=...`, y el manifiesto SHA-256 garantiza que son los originales.
+
+### E1 · Datos: contratos y calidad
+
+- **Qué se hizo:**
+  - contratos Pandera (backend Polars) para las 3 tablas y sus uniones;
+  - reporte de calidad en JSON;
+  - panel sobre la malla completa con banderas de calidad;
+  - `make calidad`;
+  - 29 tests sobre datos sintéticos.
+- **Criterio de diseño:** el contrato solo exige lo que debe cumplirse siempre (tipos, dominios, llaves, montos que
+  cuadran). Los problemas conocidos, como los conteos inconsistentes o los nulos, no lo rompen: se miden y se marcan.
+  Si un archivo nuevo rompe el contrato, la etapa no escribe nada.
+- **Qué aportó la IA:** al diseñar la prueba de fuga no se quedó con la cifra de la exploración (MA7 que incluye el
+  día, correlación 0.98). Probó ventanas que terminan después del día y una regresión por desfase, y así descubrió
+  que la señal incluye las ventas de t+1. Eso cerró el pendiente "falta verificar si usa información futura" y
+  endureció la regla de uso de la señal: con origen T, solo valores fechados en T−1 o antes. También implica que el
+  WAPE del sistema actual medido en la exploración era optimista.
+- **Decisión:** el panel incluye las filas faltantes, con medidas nulas y una bandera, en vez de omitirlas. Así los
+  lags por `shift` corresponden a días de calendario y el backtest sabe qué fechas no evaluar.
