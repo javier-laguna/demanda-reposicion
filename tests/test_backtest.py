@@ -11,11 +11,19 @@ from demanda.backtest.metricas import escala_mase
 from demanda.backtest.protocolo import Protocolo, separar
 from demanda.datos import calidad, panel
 from demanda.datos.contratos import SERIE
-from demanda.modelos import REGISTRO
+from demanda.modelos import REGISTRO, chronos2
 from demanda.modelos.baselines import MediaMovil7, SistemaActual
 
 
-def test_backtest_de_punta_a_punta(generar_tablas, carpeta_csv, tmp_path):
+def test_backtest_de_punta_a_punta(generar_tablas, carpeta_csv, tmp_path, monkeypatch, doble_chronos):
+    # Cada corrida crea su pipeline de Chronos-2 y lo cierra al terminar
+    creados = []
+
+    def cargador():
+        creados.append(doble_chronos())
+        return creados[-1]
+
+    monkeypatch.setattr(chronos2, "CARGADOR", cargador)
     raw = carpeta_csv(generar_tablas(dias=70))
     panel_path, reporte_path = tmp_path / "panel.parquet", tmp_path / "reporte.json"
     calidad.ejecutar(raw, panel_path, reporte_path)
@@ -36,6 +44,7 @@ def test_backtest_de_punta_a_punta(generar_tablas, carpeta_csv, tmp_path):
     escrito = (salida / "metricas.json").read_text()
     etapa.ejecutar(**argumentos)
     assert (salida / "metricas.json").read_text() == escrito
+    assert len(creados) == 2 and all(p.cerrado for p in creados)
 
     m = json.loads(escrito)
     assert m == json.loads(json.dumps(primera.metricas))
@@ -55,9 +64,9 @@ def test_backtest_de_punta_a_punta(generar_tablas, carpeta_csv, tmp_path):
     globales = tabla.filter(pl.col("segmento") == "global")
     assert set(globales["modelo"]) == set(REGISTRO)
     assert (tabla["n"] <= tabla["n_total"]).all()
-    # El pinball medio y la cobertura solo existen para el modelo con intervalo
+    # El pinball medio y la cobertura solo existen para los modelos con intervalo
     con_intervalo = tabla.filter(pl.col("metrica") == "cobertura_80_pct")["modelo"].unique().to_list()
-    assert con_intervalo == ["autoets"]
+    assert sorted(con_intervalo) == ["autoets", "chronos2", "lightgbm"]
 
     from mlflow import MlflowClient
 

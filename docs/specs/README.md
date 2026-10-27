@@ -9,17 +9,19 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | [E1](E1.md) | Datos: contratos y calidad | cerrada |
 | [E2](E2.md) | EDA reproducible (marimo) | cerrada |
 | [E3](E3.md) | Features, backtest y baselines | cerrada |
-| E4 | Modelos (LightGBM, Chronos-2) y validación robusta | pendiente |
+| [E4](E4.md) | Modelos (LightGBM, Chronos-2) y validación robusta | cerrada |
 | E5 | Monitor de drift y reglas de decisión | pendiente |
 | E6 | Experimento de promociones | pendiente |
 | E7 | Servidor MCP, agentes y validador | pendiente |
 | E8 | Tablero | pendiente |
 | E9 | Empaquetado y documentación | pendiente |
 | E10 | Ensayo en limpio y publicación | pendiente |
+| E11 | `PROCESS.md` y contenido de la entrega (lo decide el usuario) | cerrada |
 
 Las specs de E2 en adelante se escriben al empezar cada etapa, a partir del plan.
-El mínimo entregable es E0–E6 más E9. Si hay atraso, se recorta en este orden: Chronos-2 en todos los cortes →
-heterogeneidad causal → páginas secundarias del tablero → exponer el MCP a clientes externos.
+El mínimo entregable es E0–E6, E9 y E11 (la prueba pide `PROCESS.md`). Si hay atraso, se recorta en este orden:
+Chronos-2 en todos los cortes → heterogeneidad causal → páginas secundarias del tablero → exponer el MCP a clientes
+externos.
 
 ## Acuerdos para etapas siguientes
 
@@ -29,6 +31,8 @@ Se incorporan a la spec de su etapa cuando se escriba.
   de datos.
 - **E9:** el README aclara que `.claude/` es opcional. Son los subagentes de desarrollo, solo funcionan en Claude
   Code y quedan como evidencia del proceso; reproducir la solución solo requiere uv/make o Docker.
+- **E11:** el usuario decide qué lleva `PROCESS.md` y qué archivos entran a la entrega. Hasta entonces, la
+  bitácora de `PROCESS.md` se sigue llenando al cerrar cada etapa, como borrador del que el usuario elige.
 
 ## Protocolo de cierre de etapa
 

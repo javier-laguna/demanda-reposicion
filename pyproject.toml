@@ -9,6 +9,8 @@ authors = [
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "altair>=6.3.0",
+    "chronos-forecasting>=2.3.2",
+    "lightgbm>=4.7.0",
     "marimo>=0.25.2",
     "mlflow>=3.17.2",
     "numpy>=2.5.4",
@@ -16,7 +18,9 @@ dependencies = [
     "polars>=2.1.0",
     "pyarrow>=25.0.1",
     "pydantic-settings>=2.6",
+    "scipy>=1.18.1",
     "statsforecast>=2.1.1",
+    "torch>=2.14.1",
 ]
 
 [project.scripts]
@@ -51,3 +55,12 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.17.2",
 ]
+
+# En Linux (Docker, CI) torch sale del índice de CPU de PyTorch, sin las ruedas de CUDA; en macOS, de PyPI
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]

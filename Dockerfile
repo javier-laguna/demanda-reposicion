@@ -1,5 +1,10 @@
 FROM python:3.13-slim
 
+# LightGBM necesita OpenMP en tiempo de ejecución
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=ghcr.io/astral-sh/uv:0.7.13 /uv /uvx /bin/
 
 WORKDIR /app

@@ -98,6 +98,17 @@ def tabla_semanal(diaria: pl.DataFrame, horizonte: int) -> pl.DataFrame:
     )
 
 
+def evento_por_corte(resultado: Resultado, panel: pl.DataFrame, horizonte: int) -> dict[str, str]:
+    """El evento semanal de cada corte. Sale del calendario, así que es el mismo para todas las series; la
+    selección lo usa para comparar modelos solo en los cortes de semanas normales."""
+    primero = resultado.pronosticos.filter(pl.col("modelo") == pl.col("modelo").first())
+    semanal = tabla_semanal(tabla_diaria(Resultado(primero, resultado.escalas), panel), horizonte)
+    por_corte = semanal.select("corte", "evento").unique()
+    if por_corte["corte"].is_duplicated().any():
+        raise ValueError("un corte tiene más de un evento semanal")
+    return dict(sorted(por_corte.iter_rows()))
+
+
 def metricas_semanales() -> list[pl.Expr]:
     return [(wape() * 100).alias("wape_pct"), (sesgo() * 100).alias("sesgo_pct")]
 

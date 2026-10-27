@@ -44,6 +44,8 @@ def test_ningun_modelo_usa_informacion_futura(panel_sintetico, alterador, nombre
 
 def test_el_registro_tiene_los_baselines_en_orden():
     assert list(REGISTRO)[:4] == ["sistema_actual", "naive_estacional", "ma7", "autoets"]
+    # Los de E4 van después: el orden del registro es el del desempate en la selección
+    assert list(REGISTRO)[4:] == ["lightgbm", "chronos2"]
     assert list(crear(CONTEXTO, ["ma7", "sistema_actual"])) == ["sistema_actual", "ma7"]
     with pytest.raises(ValueError, match="no registrados"):
         crear(CONTEXTO, ["prophet"])

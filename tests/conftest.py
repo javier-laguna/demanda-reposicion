@@ -4,12 +4,14 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import polars as pl
 import pytest
 
 from demanda.backtest.protocolo import CONOCIDAS, DE_LA_SENAL
 from demanda.datos import panel
 from demanda.datos.contratos import FORMATOS, NSE, REGIONES, SERIE, Tablas
+from demanda.modelos import chronos2
 
 INICIO = date(2023, 1, 1)
 
@@ -154,3 +156,51 @@ def panel_sintetico() -> pl.DataFrame:
 def alterador():
     """La función `alterar_futuro`, para las pruebas de fugas."""
     return alterar_futuro
+
+
+class PipelineDoble:
+    """Doble de `Chronos2Pipeline.predict_df` que calcula su salida con todo lo que recibe: cada valor del
+    contexto (objetivo y covariables, pesado por su posición) y las covariables de cada día futuro. Si al
+    modelo le llegara algo del futuro, el pronóstico cambiaría. Guarda los argumentos de cada llamada."""
+
+    def __init__(self) -> None:
+        self.llamadas: list[dict] = []
+        self.cerrado = False
+
+    def cerrar(self) -> None:
+        self.cerrado = True
+
+    def predict_df(self, df, future_df, **kwargs):
+        self.llamadas.append({"df": df, "future_df": future_df, **kwargs})
+        h, niveles = kwargs["prediction_length"], kwargs["quantile_levels"]
+        filas = []
+        for item, contexto in df.groupby("item_id", sort=True):
+            contexto = contexto.sort_values("timestamp")
+            valores = contexto.drop(columns=["item_id", "timestamp"]).to_numpy(dtype=float)
+            pesos = np.arange(1, len(contexto) + 1)[:, None]
+            huella = np.nansum(valores * pesos) / pesos.sum()
+            nivel = np.nanmean(contexto["target"].to_numpy(dtype=float))
+            conocido = future_df[future_df["item_id"] == item].sort_values("timestamp")
+            covariables = conocido.drop(columns=["item_id", "timestamp"]).to_numpy(dtype=float)
+            fechas = pd.date_range(contexto["timestamp"].max(), periods=h + 1, freq="D")[1:]
+            for j in range(h):
+                mediana = nivel * (
+                    1 + 0.05 * np.nansum(covariables[j] * np.arange(1, covariables.shape[1] + 1))
+                )
+                mediana += 1e-3 * huella
+                fila = {"item_id": item, "timestamp": fechas[j]}
+                fila |= {"target_name": "target", "predictions": mediana}
+                filas.append(fila | {str(q): mediana * (0.5 + q) for q in niveles})
+        return pd.DataFrame(filas)
+
+
+@pytest.fixture(autouse=True)
+def chronos_sin_descargas(monkeypatch):
+    """En las pruebas, el `chronos2` del registro usa el doble: no descarga ni carga pesos."""
+    monkeypatch.setattr(chronos2, "CARGADOR", PipelineDoble)
+
+
+@pytest.fixture
+def doble_chronos():
+    """La clase del doble, para las pruebas que revisan cómo se llama al pipeline."""
+    return PipelineDoble

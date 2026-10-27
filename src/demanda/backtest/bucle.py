@@ -1,5 +1,6 @@
 """El bucle por corte y modelo. Cada modelo recibe solo la historia y el futuro del corte."""
 
+import time
 from collections.abc import Callable, Mapping
 from typing import NamedTuple
 
@@ -47,12 +48,18 @@ def correr(
     protocolo: Protocolo,
     progreso: Callable[[str], None] | None = None,
 ) -> Resultado:
+    """Cada modelo en cada corte. El progreso reporta los segundos por modelo, que no van a las salidas."""
     pronosticos, escalas = [], []
+    total = dict.fromkeys(modelos, 0.0)
     for origen in protocolo.origenes(ultima_fecha(panel)):
         corte = separar(panel, origen, protocolo.horizonte)
         escalas.append(escala_mase(corte.historia).with_columns(pl.lit(origen).alias("origen")))
+        segundos = {}
         for nombre, modelo in modelos.items():
+            inicio = time.perf_counter()
             pred = validar_salida(modelo.pronosticar(corte.historia, corte.futuro), corte.futuro, nombre)
+            segundos[nombre] = time.perf_counter() - inicio
+            total[nombre] += segundos[nombre]
             pronosticos.append(
                 pred.select(
                     pl.lit(nombre).alias("modelo"),
@@ -64,7 +71,9 @@ def correr(
                 )
             )
         if progreso:
-            progreso(f"corte {origen} listo")
+            progreso(f"corte {origen} listo · " + " · ".join(f"{n} {t:.1f} s" for n, t in segundos.items()))
+    if progreso:
+        progreso("tiempo por modelo: " + " · ".join(f"{n} {t:.1f} s" for n, t in total.items()))
     reales = panel.select(*SERIE, "date", unidades().alias("y"))
     return Resultado(
         pl.concat(pronosticos)

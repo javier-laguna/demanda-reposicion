@@ -30,7 +30,10 @@ make data DATA_SRC="<zip o carpeta>" # copia los 3 CSV a data/raw/ y verifica da
 make data                           # solo verifica los hashes de data/raw/
 make calidad                        # contratos + data/interim/panel.parquet + artifacts/calidad/reporte.json
 make eda                            # notebook marimo → reports/eda.html + artifacts/eda/resumen.json
-make backtest                       # 17 cortes × modelos → artifacts/backtest/ + un run de MLflow por modelo (~3 min)
+make backtest                       # 17 cortes × 6 modelos → artifacts/backtest/ + MLflow (~19 min; LightGBM ~11)
+uv run demanda backtest --modelos sistema_actual,lightgbm   # subconjunto, para desarrollar
+make seleccion                      # Diebold-Mariano + regla de campeón → artifacts/modelos/seleccion.json (segundos)
+make ajuste                         # rejilla de LightGBM en orígenes previos al backtest (~4 min; no hace falta para correr)
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
@@ -116,7 +119,20 @@ que las usa.
     con las columnas `CONOCIDAS` (calendario, tienda y `has_promotion`).
 - **Modelos:** un modelo nuevo se registra en `src/demanda/modelos/` con `registrar(nombre, fábrica)`. Con eso entra
   al backtest y a la prueba de fugas de `tests/test_modelos.py`, que altera el futuro y exige el mismo pronóstico.
-  La matriz de features para E4 está en `src/demanda/features/matriz.py`.
+  Las features están en `src/demanda/features/matriz.py`, y todo lo que entra en `FEATURES` queda cubierto por la
+  prueba de fugas de la matriz.
+- **LightGBM** (`modelos/gbm.py`):
+  - es global y directo, con un modelo por cuantil;
+  - el objetivo es y / nivel, con peso nivel, donde nivel es la mediana de 28 días;
+  - se reentrena en cada corte;
+  - los hiperparámetros salen de `make ajuste` sobre orígenes previos al backtest y viven como constante en
+    `AJUSTADOS`. Nunca se ajusta con los cortes del backtest.
+- **Chronos-2** (`modelos/chronos2.py`):
+  - corre en un proceso hijo (`proceso_chronos.py`), porque en macOS el libomp de LightGBM y el de torch tumban el
+    proceso si conviven;
+  - los pesos (`amazon/chronos-2`, revisión fijada) se bajan de Hugging Face la primera vez;
+  - en los tests se usa un doble y CI no descarga nada.
+- **Torch** viene del índice de CPU de PyTorch en Linux (`[tool.uv.sources]`). En macOS viene de PyPI.
 - **Métrica principal:** el WAPE de la suma semanal por serie y corte, solo con los pares que tienen los 7 días
   observados (80.5 %). Lo diario es diagnóstico. Hay un nivel de evento `post_buen_fin` para la semana siguiente
   al Buen Fin, así `resto` son las semanas normales.
@@ -126,3 +142,9 @@ que las usa.
   - falla en el Buen Fin (sesgo de −50 %), en la semana siguiente (+101 %, porque su señal promedia el pico) y en
     fin de año;
   - AutoETS da 24.7 % en el global, pero 13.4 % en semanas normales.
+- **Resultado de E4** (`docs/specs/E4.md`). La regla de campeón (`seleccion/campeon.py`) se fijó antes de ver
+  resultados, y mantiene a `sistema_actual`.
+  - LightGBM da 20.3 % en el global y 11.3 % en semanas normales, pero la Diebold-Mariano por corte da p = 0.17 con
+    17 cortes.
+  - Chronos-2 sin entrenar da 23.3 %, con un sesgo de −14 %.
+  - Los intervalos del 80 % de los dos cubren solo el 67–69 %.

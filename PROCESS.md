@@ -9,7 +9,7 @@ usó la IA. Se escribió al cerrar cada etapa del plan (`docs/specs/README.md`).
 |---|---|
 | Ambiente y calidad | uv (Python 3.13 fijado, `uv.lock`), ruff, pyrefly, pytest, pre-commit, gitleaks, Make |
 | Datos | Polars, Pandera _(a partir de E1)_ |
-| Modelado | LightGBM vía mlforecast, statsforecast, Chronos-2, statsmodels _(E3–E6)_ |
+| Modelado | LightGBM (sobre una matriz de features propia), statsforecast, Chronos-2, SciPy, statsmodels _(E3–E6)_ |
 | Seguimiento | MLflow local con SQLite _(E3)_ |
 | Capa de IA | Pydantic AI, con Anthropic por defecto y proveedor configurable; servidor MCP con FastMCP _(E7)_ |
 | Entrega | Streamlit _(E8)_, Docker Compose, GitHub Actions |
@@ -51,7 +51,7 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
   - herramientas de trabajo.
 
   Las versiones de 19 paquetes clave se verificaron después contra PyPI. De ahí salió el stack de la tabla de
-  arriba.
+  arriba. El documento de la investigación fue material de trabajo y no forma parte de la entrega.
 - **Definición del problema.** La IA propuso varios problemas de negocio y se eligió el pronóstico de demanda para
   reposición, por tres razones:
   - es el único con un sistema actual contra el cual medir valor;
@@ -160,3 +160,36 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
     (11.0 %, contra 13.4 % de AutoETS), y que su falla está en los picos y en la semana que sigue.
   - Ese hallazgo cambia lo que E4 tiene que demostrar: no basta con ganar en el global; también hay que no perder en
     las semanas normales.
+
+### E4 · Modelos y validación robusta
+
+- **Qué se hizo:**
+  - LightGBM global por cuantiles, sobre la matriz de E3 con 8 features nuevas de nivel y de eventos;
+  - Chronos-2 sin entrenar, con el calendario y la promoción como covariables;
+  - un ajuste de hiperparámetros con orígenes previos al backtest;
+  - la prueba Diebold-Mariano por corte;
+  - una regla de campeón determinista (`make seleccion`).
+- **Resultado:** LightGBM baja el WAPE semanal de 27.3 a 20.3 % y empata en semanas normales. Pero con 17 cortes la
+  diferencia no es significativa (p = 0.17), así que la regla mantiene al sistema actual como campeón.
+- **Cómo se usó la IA:**
+  - **Claude Code escribió la spec**, con el diseño de los modelos y la regla de campeón con sus umbrales, **antes de
+    correr ningún modelo nuevo**.
+    - La regla, los umbrales y la sensibilidad quedaron fijados por escrito antes de ver resultados. Al implementar no
+      se tocaron.
+    - Antes de escribirla, midió el costo de LightGBM y de Chronos-2 en cortes reales. Esas mediciones imprimieron un
+      WAPE preliminar de tres cortes del backtest; la spec lo declara, y ninguna decisión sale de esas cifras.
+  - **La implementación la hizo un agente general** con las instrucciones de `forecast-engineer`. Se desvió de la spec
+    en tres puntos, documentados en ella:
+    - Chronos-2 corre en un proceso aparte, porque en macOS LightGBM y torch no pueden convivir en un proceso;
+    - LightGBM entrena sus tres cuantiles en paralelo;
+    - se agregó un parámetro que la spec olvidó, sin el cual el submuestreo no tenía efecto.
+  - **La verificación no usó el código del agente.** Con scripts propios se recalcularon las métricas, las 16
+    pruebas DM y la regla; Chronos-2 se reajustó en otro ambiente; y una segunda corrida completa salió idéntica byte
+    a byte.
+  - **La revisión la hizo otro agente** con las instrucciones de `reviewer`. No encontró fugas ni errores en la regla,
+    pero sí pruebas que pasaban con el código roto: 6 de 13 mutaciones sobrevivían. El implementador las corrigió y
+    ahora fallan las seis.
+- **Qué enseñó:**
+  - Fijar la regla antes de ver resultados importó. Un 7 pp de mejora es tentador, pero viene de tres semanas
+    excepcionales, y con 17 cortes no se distingue del ruido.
+  - El resultado honesto es dejar a LightGBM como retador y medir el valor del cambio en E5, no declararlo ganador.

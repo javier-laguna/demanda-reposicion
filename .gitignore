@@ -37,3 +37,6 @@ __marimo__/
 .claude/settings.local.json
 
 .DS_Store
+
+# Notas de trabajo locales: no forman parte de la entrega
+notas/

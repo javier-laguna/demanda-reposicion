@@ -30,6 +30,17 @@ class Contexto:
 
     factor_senal: float
     n_jobs: int = 1
+    semilla: int = 0
+
+
+def ordenar_cuantiles(pred: pl.DataFrame) -> pl.DataFrame:
+    """Si los cuantiles se cruzan, los ordena por fila, así p10 ≤ yhat ≤ p90; luego recorta todo en ≥ 0.
+
+    Recortar después de ordenar no rompe el orden. Sin intervalo, solo recorta `yhat`.
+    """
+    columnas = ["p10", "yhat", "p90"] if set(INTERVALO) <= set(pred.columns) else ["yhat"]
+    orden = pl.concat_list(columnas).list.sort()
+    return pred.with_columns(orden.list.get(i).clip(lower_bound=0).alias(c) for i, c in enumerate(columnas))
 
 
 Fabrica = Callable[[Contexto], Modelo]

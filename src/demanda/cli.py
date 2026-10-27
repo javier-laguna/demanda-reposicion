@@ -57,17 +57,29 @@ def _pct(x: float | None, signo: bool = False) -> str:
     return "—" if x is None else f"{x:{'+' if signo else ''}.2f} %"
 
 
-def _backtest(args: argparse.Namespace) -> None:
-    # statsforecast y MLflow tardan en importarse: solo los carga este comando
-    from demanda.backtest import etapa
+def _progreso(mensaje: str) -> None:
+    print(mensaje, file=sys.stderr, flush=True)
 
+
+def _paneles() -> tuple[Path, Path]:
+    """El panel y el reporte de calidad, que necesitan el backtest y el ajuste."""
     cfg = get_config()
     panel_path = cfg.interim_dir / "panel.parquet"
     reporte_path = cfg.artifacts_dir / "calidad" / "reporte.json"
     for ruta in (panel_path, reporte_path):
         if not ruta.exists():
             raise FileNotFoundError(f"no existe {ruta}; corre antes `demanda calidad`")
+    return panel_path, reporte_path
+
+
+def _backtest(args: argparse.Namespace) -> None:
+    # statsforecast, LightGBM y MLflow tardan en importarse: solo los carga este comando
+    from demanda.backtest import etapa
+
+    cfg = get_config()
+    panel_path, reporte_path = _paneles()
     salida = cfg.artifacts_dir / "backtest"
+    modelos = [m.strip() for m in args.modelos.split(",") if m.strip()] if args.modelos else None
     r = etapa.ejecutar(
         panel_path,
         reporte_path,
@@ -76,7 +88,8 @@ def _backtest(args: argparse.Namespace) -> None:
         cfg.mlflow_tracking_uri,
         cfg.mlruns_dir,
         n_jobs=-1,
-        progreso=lambda mensaje: print(mensaje, file=sys.stderr),
+        modelos=modelos,
+        progreso=_progreso,
     )
     c = r.metricas["conciliacion_e2"]
     print(
@@ -105,6 +118,59 @@ def _backtest(args: argparse.Namespace) -> None:
     print(f"MLflow: {cfg.mlflow_tracking_uri}")
 
 
+def _ajustar(args: argparse.Namespace) -> None:
+    from demanda.modelos import ajuste
+
+    cfg = get_config()
+    panel_path, reporte_path = _paneles()
+    salida = cfg.artifacts_dir / "modelos" / "ajuste_lightgbm.json"
+    r = ajuste.ejecutar(
+        panel_path, reporte_path, salida, cfg.mlflow_tracking_uri, cfg.mlruns_dir, progreso=_progreso
+    )
+    print(f"orígenes: {r['protocolo']['origenes'][0]} a {r['protocolo']['origenes'][-1]} (solo P50)")
+    print(f"{'configuración':<30}{'WAPE sem':>11}")
+    for fila in (*r["rejilla"], {"nombre": r["referencia"]["modelo"], **r["referencia"]}):
+        print(f"{fila['nombre']:<30}{_pct(fila['wape_semanal_pct']):>11}")
+    print(f"ganadora: {r['ganadora']['nombre']}; cópiala en `gbm.AJUSTADOS` si cambió")
+    print(f"escrito: {salida}")
+
+
+def _seleccion(args: argparse.Namespace) -> None:
+    from demanda.seleccion import campeon
+
+    cfg = get_config()
+    backtest = cfg.artifacts_dir / "backtest"
+    metricas_path, pronosticos_path = backtest / "metricas.json", backtest / "pronosticos.parquet"
+    for ruta in (metricas_path, pronosticos_path):
+        if not ruta.exists():
+            raise FileNotFoundError(f"no existe {ruta}; corre antes `demanda backtest`")
+    salida = cfg.artifacts_dir / "modelos" / "seleccion.json"
+    s = campeon.ejecutar(metricas_path, pronosticos_path, salida)
+    print(f"incumbente: {s['incumbente']} · mejor baseline: {(s['mejor_baseline'] or {}).get('modelo', '—')}")
+    nombres = list(campeon.CRITERIOS)
+    print(f"{'modelo':<18}{'WAPE sem':>11}{'resto':>11}{'|sesgo| máx':>13}  " + "  ".join(nombres))
+    for modelo, m in s["modelos"].items():
+        celdas = [_pct(m["wape_semanal_global_pct"]), _pct(m["wape_semanal_resto_pct"])]
+        criterios = m["criterios"] or {}
+        marcas = "  ".join(
+            f"{('sí' if criterios[n]['cumple'] else 'no') if criterios else '—':<{len(n)}}" for n in nombres
+        )
+        print(
+            f"{modelo:<18}{celdas[0]:>11}{celdas[1]:>11}{_pct(m['sesgo_semanal_max_abs_pct']):>13}  {marcas}"
+        )
+    print("Diebold-Mariano (d = |E_a| − |E_b| por corte):")
+    for p in s["pruebas_dm"]:
+        diferencia = "—" if p["diferencia_wape_pp"] is None else f"{p['diferencia_wape_pp']:+.2f} pp"
+        valor_p = "— (menos de 3 cortes)" if p["p_valor"] is None else f"{p['p_valor']:.4f}"
+        print(
+            f"  {p['a']:<16} vs {p['b']:<16} {p['segmento']:<7} n={p['n_cortes']:<3} "
+            f"Δ WAPE {diferencia}  p = {valor_p}"
+        )
+    print(f"campeón: {s['campeon']}")
+    print(s["justificacion"])
+    print(f"escrito: {salida}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="demanda")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -120,7 +186,16 @@ def main(argv: list[str] | None = None) -> None:
     p_eda.set_defaults(func=_eda)
 
     p_backtest = sub.add_parser("backtest", help="backtest de origen rodante: pronósticos, métricas y MLflow")
+    p_backtest.add_argument(
+        "--modelos", help="subconjunto del registro, separado por comas (p. ej. ma7,lightgbm)"
+    )
     p_backtest.set_defaults(func=_backtest)
+
+    p_ajustar = sub.add_parser("ajustar", help="ajusta LightGBM en orígenes anteriores al backtest")
+    p_ajustar.set_defaults(func=_ajustar)
+
+    p_seleccion = sub.add_parser("seleccion", help="aplica la regla de campeón a las salidas del backtest")
+    p_seleccion.set_defaults(func=_seleccion)
 
     args = parser.parse_args(argv)
     try:

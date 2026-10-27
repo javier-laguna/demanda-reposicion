@@ -73,6 +73,7 @@ def _supuestos(horizonte: int) -> list[str]:
         f"Las métricas semanales solo usan los pares serie × corte con los {horizonte} días observados.",
         "El factor del sistema actual es un escalar ajustado con todo el periodo (E1).",
         "AutoETS rellena los nulos de la historia solo para ajustarse; pronóstico e intervalo van en ≥ 0.",
+        "LightGBM y Chronos-2 ordenan sus cuantiles si se cruzan y los recortan en ≥ 0.",
     ]
 
 
@@ -110,6 +111,20 @@ def _descripcion(modelo: Modelo) -> str:
     return next(iter((type(modelo).__doc__ or "").strip().splitlines()), "")
 
 
+def _cerrar(modelos: Mapping[str, Modelo]) -> None:
+    """Libera lo que los modelos tengan abierto, como el proceso de Chronos-2."""
+    for modelo in modelos.values():
+        cerrar = getattr(modelo, "cerrar", None)
+        if callable(cerrar):
+            cerrar()
+
+
+def _parametros(modelo: Modelo) -> dict[str, Any]:
+    """Los parámetros propios del modelo, si los expone, para su run de MLflow."""
+    parametros = getattr(modelo, "parametros", None)
+    return parametros() if callable(parametros) else {}
+
+
 def ejecutar(
     panel_path: Path,
     reporte_path: Path,
@@ -134,7 +149,10 @@ def ejecutar(
     factor = reporte["fuga_replenishment_signal"]["factor"]
 
     elegidos = crear(Contexto(factor_senal=factor, n_jobs=n_jobs), modelos)
-    resultado = bucle.correr(panel, elegidos, protocolo, progreso)
+    try:
+        resultado = bucle.correr(panel, elegidos, protocolo, progreso)
+    finally:
+        _cerrar(elegidos)
     tabla = segmentos.tabla(resultado, panel, protocolo, list(elegidos))
     origenes = protocolo.origenes(ultima_fecha(panel))
 
@@ -152,6 +170,7 @@ def ejecutar(
             "origenes": [str(o) for o in origenes],
             "factor_senal": factor,
             "modelos": list(elegidos),
+            "evento_por_corte": segmentos.evento_por_corte(resultado, panel, protocolo.horizonte),
             "supuestos": _supuestos(protocolo.horizonte),
         },
         "cobertura": _cobertura(resultado.pronosticos, protocolo.horizonte),
@@ -177,5 +196,6 @@ def ejecutar(
         "ultimo_origen": origenes[-1],
         "factor_senal": factor,
     }
-    seguimiento.registrar_runs(tracking_uri, mlruns_dir, parametros, globales, metricas_path)
+    por_modelo = {n: _parametros(m) for n, m in elegidos.items()}
+    seguimiento.registrar_runs(tracking_uri, mlruns_dir, parametros, globales, metricas_path, por_modelo)
     return Backtest(metricas, globales)
