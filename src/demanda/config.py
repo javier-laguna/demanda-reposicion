@@ -25,6 +25,10 @@ def _mlflow_por_defecto(campos: dict[str, Any]) -> str:
     return f"sqlite:///{Path(campos['artifacts_dir']).resolve() / 'mlflow.db'}"
 
 
+def _mlruns_por_defecto(campos: dict[str, Any]) -> Path:
+    return Path(campos["artifacts_dir"]) / "mlruns"
+
+
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_file=RAIZ / ".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -39,6 +43,12 @@ class Config(BaseSettings):
     mlflow_tracking_uri: str = Field(
         default_factory=_mlflow_por_defecto, validation_alias="DEMANDA_MLFLOW_TRACKING_URI"
     )
+    # Donde MLflow guarda los artefactos de cada run. El experimento fija la ruta absoluta al crearse, así
+    # que cada entorno (la laptop, Docker) usa su propia base y su propio directorio (ver compose.yaml)
+    mlruns_dir: Path = Field(default_factory=_mlruns_por_defecto, validation_alias="DEMANDA_MLRUNS_DIR")
+    # La caché de insights que se versiona (`cache.json`). La prueba de humo la apunta a un temporal, así
+    # nunca lee ni escribe la del repo
+    insights_dir: Path = RAIZ / "insights"
 
     # Capa de agentes. `llm_model` usa la notación de Pydantic AI (`proveedor:modelo`). Sin key se usa la
     # caché de insights o, si no coincide, las plantillas. `llm_base_url` es para el proveedor `openai`
@@ -67,11 +77,6 @@ class Config(BaseSettings):
     @property
     def interim_dir(self) -> Path:
         return self.data_dir / "interim"
-
-    @property
-    def mlruns_dir(self) -> Path:
-        """Donde MLflow guarda los artefactos de cada run."""
-        return self.artifacts_dir / "mlruns"
 
 
 @lru_cache

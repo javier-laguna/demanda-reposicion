@@ -1,4 +1,4 @@
-from demanda.config import Config, env_file
+from demanda.config import RAIZ, Config, env_file
 
 
 def test_mlflow_no_sigue_la_variable_estandar(monkeypatch, tmp_path):
@@ -9,6 +9,20 @@ def test_mlflow_no_sigue_la_variable_estandar(monkeypatch, tmp_path):
 
     monkeypatch.setenv("DEMANDA_MLFLOW_TRACKING_URI", "sqlite:///otro.db")
     assert Config(_env_file=None).mlflow_tracking_uri == "sqlite:///otro.db"
+
+
+def test_mlruns_e_insights_se_leen_del_entorno(monkeypatch, tmp_path):
+    # Docker usa su propio directorio de runs; la prueba de humo saca la caché de insights del repo
+    monkeypatch.setenv("ARTIFACTS_DIR", str(tmp_path))
+    for variable in ("DEMANDA_MLRUNS_DIR", "INSIGHTS_DIR"):
+        monkeypatch.delenv(variable, raising=False)
+    cfg = Config(_env_file=None)
+    assert (cfg.mlruns_dir, cfg.insights_dir) == (tmp_path / "mlruns", RAIZ / "insights")
+
+    monkeypatch.setenv("DEMANDA_MLRUNS_DIR", str(tmp_path / "mlruns-docker"))
+    monkeypatch.setenv("INSIGHTS_DIR", str(tmp_path / "insights"))
+    cfg = Config(_env_file=None)
+    assert (cfg.mlruns_dir, cfg.insights_dir) == (tmp_path / "mlruns-docker", tmp_path / "insights")
 
 
 def test_demanda_env_file_cambia_el_env_que_se_lee(monkeypatch, tmp_path):

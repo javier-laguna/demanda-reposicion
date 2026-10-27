@@ -99,6 +99,15 @@ def test_vivo_escribe_la_cache_y_auto_sin_key_la_usa(config_e7, tmp_path, monkey
     assert r["validacion"]["todas_validas"]
 
 
+def test_sin_cache_path_la_cache_vive_en_insights_dir(config_e7, tmp_path, monkeypatch, simulado):
+    carpeta = tmp_path / "insights"
+    _vivo(config_e7, carpeta / "cache.json", simulado.Modelo())
+    _sin_red(monkeypatch)
+    # La caché del repo no coincide con los artefactos sintéticos: si se leyera, todo sería plantilla
+    r = etapa.ejecutar(config_e7.model_copy(update={"insights_dir": carpeta}), "cache")
+    assert all(r["dominios"][d]["origen"] == "cache" for d in ORDEN)
+
+
 def test_cache_invalida_por_version_del_prompt(config_e7, tmp_path, simulado):
     cache_path = tmp_path / "cache.json"
     _vivo(config_e7, cache_path, simulado.Modelo())

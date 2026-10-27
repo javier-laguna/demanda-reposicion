@@ -8,6 +8,7 @@
 Los pesos se cargan una sola vez por instancia, con un cargador inyectable: el backtest crea los modelos una
 vez, y las pruebas sustituyen el cargador por un doble que no descarga nada. El cargador real deja el
 pipeline en un proceso aparte (ver `demanda.proceso_chronos`): torch y LightGBM no pueden compartir proceso.
+Si los pesos no se pueden cargar (sin red, la primera vez), `SinPesos` dice cómo correr sin Chronos-2.
 """
 
 from collections.abc import Callable
@@ -18,8 +19,8 @@ import polars as pl
 
 from demanda.datos.contratos import SERIE
 from demanda.features.matriz import unidades
-from demanda.modelos.registro import ordenar_cuantiles, registrar
-from demanda.proceso_chronos import MODELO, REVISION, PipelineAislado
+from demanda.modelos.registro import REGISTRO, ordenar_cuantiles, registrar
+from demanda.proceso_chronos import MODELO, REVISION, PipelineAislado, SinPesos
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -80,7 +81,16 @@ class Chronos2:
 
     def pipeline(self) -> Pipeline:
         if self._pipeline is None:
-            self._pipeline = self.cargador()
+            try:
+                self._pipeline = self.cargador()
+            except (RuntimeError, OSError) as e:
+                # Sin red, la descarga falla en el proceso hijo y el motivo llega en `e`
+                otros = ",".join(n for n in REGISTRO if n != "chronos2")
+                raise SinPesos(
+                    f"no se pudieron cargar los pesos de Chronos-2 ({MODELO}): la primera corrida los baja "
+                    f"de Hugging Face y necesita red. Para correr sin Chronos-2: `demanda pipeline --modelos "
+                    f"{otros}` (o `demanda backtest --modelos {otros}`). Motivo: {e}"
+                ) from e
         return self._pipeline
 
     def pronosticar(self, historia: pl.DataFrame, futuro: pl.DataFrame) -> pl.DataFrame:

@@ -25,6 +25,11 @@ REVISION = "29ec3766d36d6f73f0696f85560a422f50e8498c"
 TIMEOUT_S = 600.0  # por llamada, incluida la carga de los pesos; un corte del backtest tarda ~20 s
 
 
+class SinPesos(RuntimeError):
+    """Chronos-2 no pudo cargar sus pesos; sin red, la primera corrida no puede bajarlos. Vive aquí, y no en
+    `demanda.modelos`, para que la CLI la reconozca sin importar los modelos."""
+
+
 def _enviar(canal: IO[bytes], mensaje: Any) -> None:
     pickle.dump(mensaje, canal, protocol=pickle.HIGHEST_PROTOCOL)
     canal.flush()

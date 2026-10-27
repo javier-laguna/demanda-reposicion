@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Solución: pronóstico de demanda, decisión, drift, promociones y capa de agentes",
+    "output": ".archify/architecture-solucion-20261027-005059/solucion.html",
+    "locale": "es",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "datos", "type": "database", "label": "Datos crudos", "sublabel": "3 CSV + manifiesto SHA-256", "pos": [40, 40], "size": [160, 64] },
+    { "id": "contratos", "type": "security", "label": "Contratos de datos", "sublabel": "Pandera · calidad y fugas", "pos": [270, 40], "size": [160, 64] },
+    { "id": "features", "type": "backend", "label": "Panel y features", "sublabel": "Polars · malla completa", "tag": "calendario · tienda · lags", "pos": [500, 40], "size": [160, 64] },
+    { "id": "forecast", "type": "backend", "label": "Backtest y modelos", "sublabel": "17 cortes · 6 modelos", "tag": "Diebold-Mariano", "pos": [730, 40], "size": [160, 64] },
+    { "id": "drift", "type": "backend", "label": "Monitor de drift", "sublabel": "calidad · entradas · error", "tag": "probado con drift inyectado", "pos": [960, 40], "size": [160, 64] },
+    { "id": "decision", "type": "backend", "label": "Reglas de decisión", "sublabel": "campeón/retador · newsvendor", "pos": [1190, 40], "size": [160, 64] },
+    { "id": "causal", "type": "backend", "label": "Experimento de promos", "sublabel": "balance · efecto · potencia", "tag": "statsmodels", "pos": [500, 180], "size": [160, 64] },
+    { "id": "artefactos", "type": "database", "label": "Artefactos", "sublabel": "Parquet + JSON · MLflow", "tag": "con hash de su fuente", "pos": [1190, 180], "size": [160, 64] },
+    { "id": "usuario", "type": "external", "label": "DS / negocio", "sublabel": "decide con evidencia", "icon": "person", "pos": [1420, 40], "size": [160, 64] },
+    { "id": "tablero", "type": "frontend", "label": "Tablero", "sublabel": "Streamlit · 7 páginas", "pos": [1420, 180], "size": [160, 64] },
+    { "id": "clientes", "type": "external", "label": "Clientes MCP externos", "sublabel": "Claude Desktop · otro agente", "tag": "stdio · HTTP", "pos": [730, 320], "size": [160, 64] },
+    { "id": "mcp", "type": "backend", "label": "Servidor MCP", "sublabel": "FastMCP · 7 herramientas", "tag": "solo lectura", "pos": [960, 320], "size": [160, 64] },
+    { "id": "agentes", "type": "backend", "label": "Agentes de dominio", "sublabel": "datos · pronóstico · causal", "tag": "Pydantic AI", "pos": [960, 460], "size": [160, 64] },
+    { "id": "validador", "type": "security", "label": "Validador de cifras", "sublabel": "contra lo leído vía MCP", "tag": "reintento o plantilla", "pos": [1190, 460], "size": [160, 64] },
+    { "id": "orquestador", "type": "backend", "label": "Orquestador", "sublabel": "resumen ejecutivo", "tag": "sin herramientas", "pos": [1190, 600], "size": [160, 64] },
+    { "id": "insights", "type": "database", "label": "Insights", "sublabel": "insights.json · caché", "tag": "caché versionada en git", "pos": [1420, 600], "size": [160, 64] },
+    { "id": "llm", "type": "external", "label": "Proveedor LLM", "sublabel": "Anthropic · Opus 5.5 (default)", "tag": "OpenRouter u otro por .env", "pos": [730, 600], "size": [160, 64] },
+    { "id": "claude", "type": "external", "label": "Claude Code", "sublabel": "subagentes por etapa", "pos": [40, 320], "size": [160, 64] },
+    { "id": "repo", "type": "cloud", "label": "Repo GitHub", "sublabel": "código · tests · specs", "pos": [270, 320], "size": [160, 64] },
+    { "id": "docs", "type": "cloud", "label": "MCP de documentación", "sublabel": "Nixtla · DeepWiki", "pos": [40, 460], "size": [160, 64] },
+    { "id": "ci", "type": "cloud", "label": "GitHub Actions", "sublabel": "ruff · pyrefly · pytest", "pos": [270, 460], "size": [160, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Pipeline determinista · Docker + uv", "wraps": ["datos", "contratos", "features", "forecast", "drift", "decision", "causal", "artefactos"] },
+    { "kind": "security-group", "label": "Capa de IA · solo lectura vía MCP", "wraps": ["mcp", "agentes", "validador", "orquestador"] },
+    { "kind": "region", "label": "Desarrollo · no se despliega", "wraps": ["claude", "repo", "docs", "ci"] }
+  ],
+  "connections": [
+    { "id": "datos-contratos", "from": "datos", "to": "contratos", "label": "CSV", "variant": "emphasis" },
+    { "id": "contratos-features", "from": "contratos", "to": "features", "label": "válido", "variant": "emphasis" },
+    { "id": "features-forecast", "from": "features", "to": "forecast", "label": "panel", "variant": "emphasis" },
+    { "id": "forecast-drift", "from": "forecast", "to": "drift", "label": "errores", "variant": "emphasis" },
+    { "id": "drift-decision", "from": "drift", "to": "decision", "label": "alertas", "variant": "emphasis" },
+    { "id": "features-causal", "from": "features", "to": "causal", "label": "panel", "fromSide": "bottom", "toSide": "top" },
+    { "id": "decision-artefactos", "from": "decision", "to": "artefactos", "label": "escribe", "fromSide": "bottom", "toSide": "top", "variant": "emphasis" },
+    { "id": "causal-artefactos", "from": "causal", "to": "artefactos", "label": "efecto + IC" },
+    { "id": "artefactos-tablero", "from": "artefactos", "to": "tablero", "label": "lee" },
+    { "id": "usuario-tablero", "from": "usuario", "to": "tablero", "label": "usa", "fromSide": "bottom", "toSide": "top", "variant": "emphasis" },
+    { "id": "artefactos-mcp", "from": "artefactos", "to": "mcp", "label": "lee", "fromSide": "left", "toSide": "top" },
+    { "id": "clientes-mcp", "from": "clientes", "to": "mcp", "label": "tools", "variant": "dashed" },
+    { "id": "agentes-mcp", "from": "agentes", "to": "mcp", "label": "tools", "fromSide": "top", "toSide": "bottom" },
+    { "id": "agentes-llm", "from": "agentes", "to": "llm", "label": "API", "fromSide": "bottom", "toSide": "top" },
+    { "id": "agentes-validador", "from": "agentes", "to": "validador", "label": "texto", "variant": "security" },
+    { "id": "validador-orquestador", "from": "validador", "to": "orquestador", "label": "validados", "variant": "security", "fromSide": "bottom", "toSide": "top" },
+    { "id": "orquestador-llm", "from": "orquestador", "to": "llm", "label": "API" },
+    { "id": "orquestador-insights", "from": "orquestador", "to": "insights", "label": "resumen" },
+    { "id": "insights-tablero", "from": "insights", "to": "tablero", "label": "lee", "fromSide": "top", "toSide": "bottom" },
+    { "id": "claude-repo", "from": "claude", "to": "repo", "label": "código", "variant": "dashed" },
+    { "id": "docs-claude", "from": "docs", "to": "claude", "label": "docs", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "id": "repo-ci", "from": "repo", "to": "ci", "label": "push", "variant": "dashed", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Pipeline determinista", "items": ["Dos corridas dan los mismos artefactos: uv.lock, semillas y JSON estable", "17 cortes semanales × 6 modelos, con Diebold-Mariano por corte", "Regla de campeón pre-registrada: sigue el sistema actual; LightGBM (20.3 % contra 27.3 %) no es significativo", "Newsvendor sobre el campeón: 40 % menos costo (p = 0.019)"] },
+    { "dot": "orange", "title": "Monitor de drift", "items": ["Calidad, entradas y desempeño; separa lo esperado por calendario", "Detecta los 3 escenarios inyectados y la falla real de una tienda", "Límite conocido: confunde la estacionalidad anual en noviembre y enero"] },
+    { "dot": "emerald", "title": "Experimento de promociones", "items": ["Asignación al azar verificada con 19 pruebas de balance", "Unidades: +0.05 % (IC95 de −0.25 a +0.34 %); solo Bebidas responde", "Ningún descuento de 5 a 20 % se paga", "Los conteos inconsistentes son los días de promoción"] },
+    { "dot": "violet", "title": "Capa de IA (Pydantic AI)", "items": ["Tres agentes de dominio y un orquestador; no calculan ni deciden", "Leen solo vía MCP; get_forecast queda para clientes interactivos", "Cada cifra debe estar en lo que el agente leyó, también en el resumen", "Sin key: caché versionada con huella o plantillas deterministas"] },
+    { "dot": "amber", "title": "Replicable y seguro", "items": ["Datos fuera del repo: make data verifica hashes SHA-256", "docker compose levanta pipeline, tablero, MLflow y MCP", "Secretos en .env, gitleaks en pre-commit y en CI", "Freno de gasto: USD 1 por corrida y USD 20 acumulado"] },
+    { "dot": "slate", "title": "Desarrollo", "items": ["Claude Code con subagentes por etapa construye el repo", "Specs pre-registradas, revisión independiente con mutaciones", "Nada del runtime depende de Claude Code"] }
+  ]
+}

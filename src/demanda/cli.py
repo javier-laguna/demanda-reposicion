@@ -4,14 +4,21 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
+import time
+import traceback
+from collections.abc import Callable
 from pathlib import Path
 
 from demanda.config import RAIZ, get_config
 from demanda.datos import calidad, fuente
+from demanda.proceso_chronos import SinPesos
 
 NOTEBOOK_EDA = RAIZ / "notebooks" / "eda.py"
 # No se importa: es el script que corre `streamlit run`
 TABLERO = Path(__file__).resolve().parent / "app" / "principal.py"
+# Las fallas que se explican solas: se imprimen sin traceback
+ERRORES_CLAROS = (FileNotFoundError, ValueError, SinPesos)
 
 
 def _data(args: argparse.Namespace) -> None:
@@ -51,7 +58,13 @@ def _eda(args: argparse.Namespace) -> None:
     salida.parent.mkdir(parents=True, exist_ok=True)
     # Exportar ejecuta el notebook completo; marimo sale con error si alguna celda falla
     comando = [sys.executable, "-m", "marimo", "export", "html", str(NOTEBOOK_EDA), "-o", str(salida), "-f"]
-    if subprocess.run(comando, check=False).returncode:
+    # marimo guarda la salida de cada celda en `notebooks/__marimo__/session/`, y con los datos reales lleva
+    # identificadores de tienda. Con `PYTHONPYCACHEPREFIX` la escribe bajo ese prefijo, como `__pycache__`:
+    # un temporal la descarta
+    with tempfile.TemporaryDirectory() as prefijo:
+        entorno = {**os.environ, "PYTHONPYCACHEPREFIX": prefijo}
+        codigo = subprocess.run(comando, check=False, env=entorno).returncode
+    if codigo:
         raise SystemExit(1)
     print(f"escrito: {salida} y {cfg.artifacts_dir / 'eda' / 'resumen.json'}")
 
@@ -386,6 +399,76 @@ def _insights(args: argparse.Namespace) -> None:
     print(f"escrito: {cfg.artifacts_dir / 'insights' / 'insights.json'}")
 
 
+# El pipeline completo, en orden. `ajustar` queda fuera: sus hiperparámetros ya viven en `gbm.AJUSTADOS`
+ETAPAS: dict[str, Callable[[argparse.Namespace], None]] = {
+    "calidad": _calidad,
+    "eda": _eda,
+    "backtest": _backtest,
+    "seleccion": _seleccion,
+    "calibracion": _calibracion,
+    "decision": _decision,
+    "drift": _drift,
+    "causal": _causal,
+    "insights": _insights,
+}
+
+
+def etapas_a_correr(desde: str | None = None) -> list[str]:
+    """Las etapas del pipeline a partir de `desde` (incluida)."""
+    nombres = list(ETAPAS)
+    if desde is None:
+        return nombres
+    if desde not in ETAPAS:
+        raise ValueError(f"etapa desconocida: {desde}; usa {', '.join(ETAPAS)}")
+    return nombres[nombres.index(desde) :]
+
+
+def _duracion(segundos: float) -> str:
+    return f"{segundos:.1f} s" if segundos < 60 else f"{segundos / 60:.1f} min"
+
+
+def _tiempos(tiempos: list[tuple[str, float]], fallida: str | None = None) -> None:
+    print("tiempo por etapa:")
+    for nombre, segundos in tiempos:
+        marca = "  (falló)" if nombre == fallida else ""
+        print(f"  {nombre:<12}{_duracion(segundos):>10}{marca}")
+    print(f"  {'total':<12}{_duracion(sum(s for _, s in tiempos)):>10}", flush=True)
+
+
+def _pipeline(args: argparse.Namespace) -> None:
+    # Cada etapa recibe este mismo `args`: el backtest lee `modelos` y los insights, `modo`
+    cfg = get_config()
+    faltan = [n for n in fuente.ARCHIVOS if not (cfg.raw_dir / n).exists()]
+    if faltan:
+        raise FileNotFoundError(
+            f"faltan {', '.join(faltan)} en {cfg.raw_dir}; colócalos antes con "
+            "`make data DATA_SRC=<zip o carpeta>`"
+        )
+    tiempos: list[tuple[str, float]] = []
+    for nombre in etapas_a_correr(args.desde):
+        print(f"\n== {nombre} ==", flush=True)
+        inicio = time.perf_counter()
+        try:
+            ETAPAS[nombre](args)
+        except (Exception, SystemExit) as e:
+            tiempos.append((nombre, time.perf_counter() - inicio))
+            # El EDA sale con SystemExit y marimo ya imprimió su error; lo inesperado lleva su traceback
+            if isinstance(e, ERRORES_CLAROS):
+                print(f"error: {e}", file=sys.stderr)
+            elif not isinstance(e, SystemExit):
+                traceback.print_exc()
+            _tiempos(tiempos, fallida=nombre)
+            print(
+                f"el pipeline se detuvo en `{nombre}`; corrige y retoma con "
+                f"`demanda pipeline --desde {nombre}`",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from e
+        tiempos.append((nombre, time.perf_counter() - inicio))
+    print()
+    _tiempos(tiempos)
+
+
 def _mcp(args: argparse.Namespace) -> None:
     from demanda.mcp_server import servidor
 
@@ -477,6 +560,19 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_insights.set_defaults(func=_insights)
 
+    p_pipeline = sub.add_parser(
+        "pipeline", help="todas las etapas en orden, de calidad a insights (supone que `make data` ya corrió)"
+    )
+    p_pipeline.add_argument("--desde", choices=list(ETAPAS), help="retoma a partir de esta etapa")
+    p_pipeline.add_argument("--modelos", help="subconjunto del registro para el backtest, como en `backtest`")
+    p_pipeline.add_argument(
+        "--modo",
+        choices=("auto", "vivo", "cache", "plantilla"),
+        default="auto",
+        help="el de la etapa de insights (auto por omisión)",
+    )
+    p_pipeline.set_defaults(func=_pipeline)
+
     p_mcp = sub.add_parser(
         "mcp", help="servidor MCP de solo lectura sobre los artefactos (stdio por omisión)"
     )
@@ -493,7 +589,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     try:
         args.func(args)
-    except (FileNotFoundError, ValueError) as e:
+    except ERRORES_CLAROS as e:
         print(f"error: {e}", file=sys.stderr)
         raise SystemExit(1) from e
 

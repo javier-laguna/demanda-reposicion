@@ -1,8 +1,9 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal insights mcp app lint format types test validate docker-build up
+.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal insights pipeline mcp app lint format types test validate docker-build up
 
 DATA_SRC ?=
 MODO ?=
+DESDE ?=
 
 help:  ## lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -44,6 +45,9 @@ causal:  ## experimento de promociones: artifacts/causal/promociones.json
 insights:  ## agentes, caché o plantillas (MODO=auto|vivo|cache|plantilla): artifacts/insights/insights.json
 	uv run demanda insights $(if $(MODO),--modo $(MODO))
 
+pipeline:  ## de calidad a insights, en orden (requiere make data; DESDE=etapa para retomar, MODO= de insights)
+	uv run demanda pipeline $(if $(DESDE),--desde $(DESDE)) $(if $(MODO),--modo $(MODO))
+
 mcp:  ## servidor MCP de solo lectura por stdio (HTTP en el 8765: uv run demanda mcp --http)
 	uv run demanda mcp
 
@@ -69,5 +73,5 @@ validate: lint types test  ## lint + tipos + tests (requisito para cada commit)
 docker-build:  ## construye la imagen
 	docker compose build
 
-up:  ## corre el servicio con docker compose (requiere make data antes)
+up:  ## tablero, MCP y MLflow con docker compose (leen los artefactos: corre antes el pipeline)
 	docker compose up

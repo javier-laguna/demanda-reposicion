@@ -342,3 +342,33 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
     y mueren las 34 que aplican.
 - **Qué enseñó:** en un tablero, que una página «cargue sin error» no prueba casi nada. Las pruebas útiles fijan lo
   que debe verse y lo que no.
+
+### E9 · Empaquetado y documentación
+
+- **Qué se hizo:**
+  - `demanda pipeline` (`make pipeline`), que corre todas las etapas en orden y sabe retomar;
+  - una imagen Docker multi-etapa y un `compose.yaml` con pipeline, tablero, MCP por HTTP y MLflow;
+  - MLflow por entorno;
+  - una prueba de humo que corre el pipeline completo sobre datos sintéticos;
+  - un job de CI que construye la imagen;
+  - el README, la model card, la guía de despliegue y el diagrama final.
+- **Resultado:**
+  - la imagen pesa 3.4 GB (antes 5.6);
+  - los cuatro servicios responden;
+  - la prueba de humo corre el pipeline completo en ~1 min sin tocar los artefactos del repo.
+- **Cómo se usó la IA:**
+  - **Claude Code escribió la spec, el Dockerfile, el `compose.yaml` y los documentos**: el README, la model card con
+    sus cifras leídas de los artefactos, la guía de despliegue y el diagrama.
+  - **El comando del pipeline, la prueba de humo y la verificación de los servicios** los hizo un agente general.
+    Dos decisiones las justificó con datos:
+    - 40 tiendas sintéticas, porque la Wald agrupada de E6 necesita al menos 37 clústeres;
+    - LightGBM con 50 árboles en la prueba, para pasar de 8 min a ~1 min.
+  - **La revisión la hizo otro agente** con las instrucciones de `reviewer`, con pruebas de mutación. Encontró dos
+    cosas que ninguna prueba veía:
+    - la imagen copiaba el caché de sesión de marimo, que con datos reales lleva salidas del EDA con identificadores
+      de tiendas. Git lo ignoraba, Docker no;
+    - sin red, el backtest se detenía en Chronos-2, cuando la spec decía que los demás modelos seguirían.
+
+    También sobrevivían 4 de 18 mutaciones.
+- **Qué enseñó:** el `.gitignore` y el `.dockerignore` son dos listas distintas de lo que no debe salir de la máquina,
+  y hay que revisarlas por separado.

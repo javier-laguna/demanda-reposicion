@@ -2,7 +2,8 @@
 
 Modos:
 - `vivo`: los agentes con el proveedor de `LLM_MODEL`; requiere su key y reescribe `insights/cache.json`
-  con los dominios que salieron en vivo (ver `cache.py`: la caché es de una sola corrida);
+  (`INSIGHTS_DIR` cambia la carpeta) con los dominios que salieron en vivo (ver `cache.py`: la caché es de
+  una sola corrida);
 - `cache`: `insights/cache.json`; cada dominio cuya entrada no vale usa su plantilla;
 - `plantilla`: las conclusiones generadas en Python, sin LLM;
 - `auto` (por omisión): `vivo` si hay key; si no, `cache`.
@@ -24,12 +25,10 @@ from demanda.agentes import cache, orquestador, proveedor
 from demanda.agentes.modelos import DOMINIOS, ORDEN, ORQUESTADOR, ResultadoDominio
 from demanda.agentes.presupuesto import Presupuesto, leer_gasto, registrar_corrida
 from demanda.agentes.prompts import PROMPT_VERSION, hash_prompts
-from demanda.config import RAIZ, Config
+from demanda.config import Config
 from demanda.mcp_server import herramientas
 
 MODOS = ("auto", "vivo", "cache", "plantilla")
-# Se versiona: vive fuera de artifacts/
-CACHE = RAIZ / "insights" / "cache.json"
 
 
 def requeridos(artefactos: Path) -> None:
@@ -105,7 +104,8 @@ def ejecutar(
 ) -> dict[str, Any]:
     """Escribe `insights.json` en el modo pedido. `modelo` reemplaza al del proveedor (pruebas)."""
     artefactos = cfg.artifacts_dir
-    cache_path = cache_path or CACHE
+    # La caché se versiona: vive fuera de artifacts/
+    cache_path = cache_path or cfg.insights_dir / "cache.json"
     salida = artefactos / "insights" / "insights.json"
     gasto_path = artefactos / "insights" / "gasto.json"
     requeridos(artefactos)

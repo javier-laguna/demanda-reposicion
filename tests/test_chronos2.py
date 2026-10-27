@@ -9,9 +9,11 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from demanda.backtest import bucle
 from demanda.backtest.bucle import validar_salida
-from demanda.backtest.protocolo import separar, ultima_fecha
+from demanda.backtest.protocolo import Protocolo, separar, ultima_fecha
 from demanda.modelos import Contexto, chronos2, crear
+from demanda.proceso_chronos import SinPesos
 
 
 @pytest.fixture(scope="module")
@@ -72,6 +74,25 @@ def test_el_registro_usa_el_doble_en_las_pruebas(corte):
     modelo = crear(Contexto(factor_senal=0.53), ["chronos2"])["chronos2"]
     assert isinstance(modelo, chronos2.Chronos2)
     assert type(modelo.pipeline()).__name__ == "PipelineDoble"
+
+
+def test_sin_red_el_error_dice_como_correr_sin_chronos(panel_sintetico, doble_chronos, monkeypatch):
+    class SinRed(doble_chronos):
+        """Como `PipelineAislado` cuando el hijo no puede bajar los pesos."""
+
+        def __init__(self) -> None:
+            raise RuntimeError(
+                'Chronos-2 falló en su proceso: OSError("We couldn\'t connect to huggingface.co")'
+            )
+
+    monkeypatch.setattr(chronos2, "CARGADOR", SinRed)
+    modelos = crear(Contexto(factor_senal=0.53), ["sistema_actual", "chronos2"])
+    with pytest.raises(SinPesos) as excinfo:
+        bucle.correr(panel_sintetico, modelos, Protocolo(n_cortes=2))
+    mensaje = str(excinfo.value)
+    assert "no se pudieron cargar los pesos de Chronos-2" in mensaje and "necesita red" in mensaje
+    assert "`demanda pipeline --modelos sistema_actual,naive_estacional,ma7,autoets,lightgbm`" in mensaje
+    assert "huggingface.co" in mensaje  # el motivo del hijo
 
 
 def _pesos_en_cache() -> bool:

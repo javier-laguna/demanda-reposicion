@@ -1,13 +1,59 @@
 name: demanda-reposicion
 
+# Una sola imagen y cuatro servicios. `pipeline` corre una vez y termina; los demás leen sus artefactos.
+# Los datos se colocan antes con `make data`. Sin uv, el zip se monta en el contenedor, porque fuera de
+# ./data no se ve: `docker compose run --rm -v "$PWD/datos.zip:/tmp/datos.zip:ro" pipeline data
+# --src /tmp/datos.zip`.
+x-demanda: &demanda
+  build: .
+  image: demanda-reposicion:latest
+  volumes:
+    - ./data:/app/data
+    - ./artifacts:/app/artifacts
+    - ./reports:/app/reports
+    - ./insights:/app/insights
+    - hf-cache:/hf
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    # MLflow propio del contenedor: el experimento guarda la ruta absoluta de sus runs y la de la laptop no
+    # existe aquí
+    DEMANDA_MLFLOW_TRACKING_URI: sqlite:////app/artifacts/mlflow-docker.db
+    DEMANDA_MLRUNS_DIR: /app/artifacts/mlruns-docker
+
 services:
-  demanda:
-    build: .
-    volumes:
-      - ./data:/app/data
-      - ./artifacts:/app/artifacts
-      - ./reports:/app/reports
-    env_file:
-      - path: .env
-        required: false
-    command: ["data"]
+  pipeline:
+    <<: *demanda
+    command: ["pipeline"]
+    profiles: ["pipeline"]
+
+  app:
+    <<: *demanda
+    command: ["app", "--host", "0.0.0.0", "--port", "8501"]
+    ports:
+      - "8501:8501"
+
+  mcp:
+    <<: *demanda
+    command: ["mcp", "--http", "--host", "0.0.0.0", "--port", "8765"]
+    ports:
+      - "8765:8765"
+
+  mlflow:
+    <<: *demanda
+    entrypoint: ["mlflow"]
+    command:
+      - ui
+      - --backend-store-uri
+      - sqlite:////app/artifacts/mlflow-docker.db
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+    # En macOS el receptor de AirPlay ocupa el 5000 del host: MLFLOW_PORT=5001 docker compose up mlflow
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+
+volumes:
+  hf-cache:

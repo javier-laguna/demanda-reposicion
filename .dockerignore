@@ -1,6 +1,5 @@
 .git
 .venv
-.archify
 .claude
 Prueba_Tecnica_DS
 *.zip
@@ -12,4 +11,13 @@ reports
 **/__pycache__
 **/.pytest_cache
 **/.ruff_cache
+# La caché de sesión de marimo: las salidas de cada celda del EDA, con identificadores de tienda
+**/__marimo__
 notas
+tests
+# Del diagrama solo entran el candidato y el HTML; los recibos llevan rutas locales
+.archify/**/*.finalize*.json
+.archify/**/*.browser-check.json
+.archify/**/*.delivery.json
+.archify/**/visual-check
+.archify/**/review-*

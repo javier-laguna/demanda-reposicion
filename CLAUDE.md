@@ -29,6 +29,7 @@ make setup                          # uv sync --locked + hooks de pre-commit
 make data DATA_SRC="<zip o carpeta>" # copia los 3 CSV a data/raw/ y verifica data/manifest.sha256
 make data                           # solo verifica los hashes de data/raw/
 make calidad                        # contratos + data/interim/panel.parquet + artifacts/calidad/reporte.json
+make pipeline                       # todas las etapas de calidad a insights, en orden (~25 min; DESDE=etapa retoma)
 make eda                            # notebook marimo → reports/eda.html + artifacts/eda/resumen.json
 make backtest                       # 17 cortes × 6 modelos → artifacts/backtest/ + MLflow (~19 min; LightGBM ~11)
 uv run demanda backtest --modelos sistema_actual,lightgbm   # subconjunto, para desarrollar
@@ -42,6 +43,7 @@ make insights                       # agentes: vivo con key, si no caché o plan
 make insights MODO=vivo             # fuerza el modo vivo (~USD 0.4, ~2 min); actualiza insights/cache.json
 make mcp                            # servidor MCP de solo lectura por stdio (demanda mcp --http: 127.0.0.1:8765)
 make app                            # tablero Streamlit en http://127.0.0.1:8501 (solo lee artefactos)
+docker compose build && docker compose run --rm pipeline   # lo mismo en Docker; luego docker compose up app mcp mlflow
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
@@ -228,6 +230,24 @@ que las usa.
   - el límite duro va en la consola del proveedor.
 - **Tests:** nunca salen a la red (`ALLOW_MODEL_REQUESTS = False`), vacían las keys del entorno y apuntan
   `DEMANDA_ENV_FILE` a un archivo inexistente, así que nunca leen el `.env` real.
+
+## Empaquetado
+
+- **Docker:**
+  - imagen multi-etapa de ~3.4 GB (torch ocupa 652 MB y solo lo usa Chronos-2), con un solo `compose.yaml`;
+  - `pipeline` va en el perfil `pipeline` y corre con `docker compose run --rm pipeline`. `app`, `mcp` (HTTP en
+    :8765) y `mlflow` (en `${MLFLOW_PORT:-5000}`, porque AirPlay ocupa el 5000 en macOS) se levantan con `up`.
+- **Volúmenes:** `data/`, `artifacts/`, `reports/` e `insights/` se comparten con el host. Los pesos de Chronos-2
+  viven en el volumen `hf-cache` (`HF_HOME=/hf`).
+- **MLflow por entorno:** Docker usa `artifacts/mlflow-docker.db` y `artifacts/mlruns-docker/` (`DEMANDA_MLFLOW_TRACKING_URI`
+  y `DEMANDA_MLRUNS_DIR`), porque el experimento guarda la ruta absoluta de sus runs.
+- **La caché de insights** se lee de `INSIGHTS_DIR`, por omisión `insights/`. La prueba de humo la apunta a un
+  temporal.
+- **Prueba de humo** (`tests/test_humo_pipeline.py`):
+  - corre el pipeline completo por la CLI sobre 40 tiendas sintéticas, con `sistema_actual,lightgbm` y LightGBM de
+    50 árboles. Hacen falta 40 porque la Wald agrupada de B1 tiene 36 pendientes y necesita al menos 37 clústeres;
+  - tarda ~1 min.
+- **CI** corre `make validate`, pre-commit, gitleaks sobre el historial y un `docker build`.
 
 ## Tablero
 
