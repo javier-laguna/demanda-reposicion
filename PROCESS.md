@@ -229,3 +229,50 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
   - Pre-registrar también expone los errores de diseño de la spec. La referencia móvil de 56 días no distingue la
     estacionalidad anual, y alertó en noviembre, cosa que la spec no anticipó. Queda documentado y no se ajustó
     mirando esas semanas.
+
+### E6 · Experimento de promociones
+
+- **Qué se hizo:**
+  - la verificación formal de que `has_promotion` se asignó al azar, con 19 pruebas de balance;
+  - el efecto causal sobre las unidades con efectos fijos de serie y de fecha, errores agrupados por tienda,
+    inferencia por aleatorización y una calibración A/A de los errores;
+  - el efecto por canal (tráfico, ingreso, precio, canasta), por categoría y formato con Holm, la dinámica (adelanto
+    de compras) y el efecto sobre las otras categorías;
+  - la potencia del diseño actual y de uno semanal;
+  - la traducción a utilidad con márgenes y descuentos como parámetros;
+  - el diseño del próximo A/B en `docs/causal_promos.md`.
+- **Resultado:**
+  - la promoción no mueve las unidades (+0.05 %, IC95 de −0.25 a +0.34 %), salvo en Bebidas (+1.45 %). El nulo es
+    preciso: el diseño detecta efectos de 0.42 %;
+  - con cualquier descuento de 5 a 20 %, ninguna categoría se paga;
+  - **los «conteos inconsistentes» de E1 son exactamente los días con promoción.** Ese día `total_transactions` sube
+    22 % sin que cambien los pagos, las unidades ni el monto.
+- **Cómo se usó la IA:**
+  - **Claude Code escribió la spec con el método, las familias de Holm y las reglas de conclusión antes de estimar el
+    efecto.** Lo único que corrió antes fue una prueba de factibilidad con una promoción placebo, declarada en la
+    spec.
+  - **La implementación la hizo un agente general** con las instrucciones de `causal-analyst`. Cambió una cosa de la
+    spec y la justificó con datos: la Wald conjunta sin corregir rechazaba el 46 % de los placebos, así que agregó
+    la corrección de Hotelling.
+  - **La verificación usó otra librería.** Un script propio con pyfixest, escrito desde la spec, recalculó todos los
+    efectos. Coinciden.
+    - Ese mismo script encontró el hallazgo de registro antes que el implementador: la bandera de conteos dependía
+      por completo de la promoción.
+  - **La regla de balance pre-registrada falló por esa bandera**, y se reporta tal cual.
+    - La separación entre pruebas de asignación y de medición se agregó después, declarada como tal en el código, la
+      spec y el JSON.
+    - Fue un error de diseño de la spec: metió una variable medida el mismo día en una regla de asignación.
+  - **La revisión la hizo otro agente** con las instrucciones de `reviewer`, con pruebas de mutación. No encontró
+    errores en los cálculos, pero sí tres cosas:
+    - `make validate` fallaba por tres líneas que Claude Code agregó al separar asignación y medición;
+    - la potencia del diseño semanal, extrapolada con 1/√semanas, daba cifras imposibles: una semana para detectar
+      5 %, cuando con una semana el efecto no está identificado;
+    - sobrevivían 22 de 41 mutaciones.
+
+    Tras los arreglos, la potencia se mide con placebos en ventanas reales y hay 15 pruebas más. Ahora mueren 41 de
+    44 mutaciones: 2 de las restantes son equivalentes y la otra solo mueve un grado de libertad.
+- **Qué enseñó:**
+  - Un experimento natural no solo mide un efecto: también audita los datos. La bandera de calidad más extraña del
+    dataset resultó ser la huella de la promoción en el registro.
+  - El efecto nulo no basta como respuesta de negocio. Lo que decide es que el IC completo queda lejos del lift de
+    equilibrio.

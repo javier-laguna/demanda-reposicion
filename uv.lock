@@ -454,6 +454,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "scipy" },
     { name = "statsforecast" },
+    { name = "statsmodels" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
@@ -480,6 +481,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "scipy", specifier = ">=1.18.1" },
     { name = "statsforecast", specifier = ">=2.1.1" },
+    { name = "statsmodels", specifier = ">=0.15.0" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.14.1" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.14.1", index = "https://download.pytorch.org/whl/cpu" },
 ]

@@ -37,6 +37,7 @@ make ajuste                         # rejilla de LightGBM en orígenes previos a
 make calibracion                    # campeón y retador en 8 orígenes previos → artifacts/backtest/calibracion.parquet (~4 min)
 make decision                       # newsvendor: 3 políticas, impacto y sensibilidad → artifacts/decision/impacto.json (segundos)
 make drift                          # monitor semana a semana y drift inyectado → artifacts/drift/monitor.json (~15 s)
+make causal                         # experimento de promociones → artifacts/causal/promociones.json (~20 s)
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
@@ -80,17 +81,21 @@ que las usa.
   dice el diccionario. Con el protocolo de la exploración (suma de T+1 a T+7, orígenes desde 2023-07-01), el WAPE
   del sistema actual es 18.6 % con la señal de T y **20.1 % con la de T−1**, contra 21.6 % de la MA7. En las
   semanas con Buen Fin llega a 44 %. Los resultados del backtest de E3 están en «Backtest y modelos».
-- **Conteos inconsistentes en ~20 % de las filas**, uniformes por tienda, categoría y mes:
-  `cash_transactions + card_transactions < total_transactions`, y en esas filas
-  `avg_ticket = amount_total / (cash + card)`, que sobreestima el ticket real en ~22 %. Los montos sí cuadran:
-  `amount_cash + amount_card == amount_total`.
+- **Conteos inconsistentes en ~20 % de las filas, que son exactamente los días con promoción** (lo encontró E6):
+  - en esas filas, `cash_transactions + card_transactions < total_transactions`. `total_transactions` vale en
+    promedio 1.22 × (cash + card), de 1.08 a 1.35; en los demás días vale exactamente lo mismo;
+  - la promoción no mueve ni las transacciones pagadas, ni las unidades, ni el monto, así que el exceso son registros
+    sin pago;
+  - por eso `avg_ticket = amount_total / (cash + card)` es el ticket por transacción pagada, y
+    `amount_total / total_transactions` lo subestima ~18 % en los días con promoción;
+  - los montos sí cuadran: `amount_cash + amount_card == amount_total`.
 - **Huecos de la malla:** solo 42 filas: `STR_045` (2023-02-01/02), `STR_064` (2023-02-22/23) y `STR_055`
   (2024-02-18 a 20; cae en la ventana de test).
 - **Nulos dispersos:** `cash_transactions` y `amount_cash` ~6 % (siempre juntos), `units_sold` ~3 %, `avg_ticket`
   ~2.4 %. Todos los nulos de `avg_ticket` caen en filas sin efectivo, porque se calcula con `cash + card`.
 - **Promociones asignadas al azar** (20 % uniforme por formato, día, mes y nivel previo; sin autocorrelación),
-  con lift ingenuo pequeño: +1.8 % en Bebidas (IC95 de 0.05 a 3.6 %) y entre −0.6 % y +0.9 % en el resto. E6 lo
-  estima formalmente.
+  con lift ingenuo pequeño: +1.8 % en Bebidas (IC95 de 0.05 a 3.6 %) y entre −0.6 % y +0.9 % en el resto. E6
+  confirma la asignación con pruebas de balance y estima el efecto (ver «Promociones»).
 - **Calendario multiplicativo y casi idéntico por categoría** (rango ≤ 4 %, salvo Semana Santa con 9.5 % en dos
   días). Contra la misma serie, mes y día de la semana en días limpios, los efectos son:
   - Buen Fin ×2.65, quincena ×1.38, fin de semana ×1.53 y Semana Santa ×0.66.
@@ -176,4 +181,23 @@ que las usa.
   - LightGBM baja otro 9 %, sin significancia (p = 0.20), y empata en semanas normales;
   - el costo está en los eventos (Buen Fin: 114 de 213 M);
   - el monitor detecta los tres escenarios inyectados y la falla real de STR_055, pero su chequeo de nivel confunde
-    la estacionalidad anual con drift: en noviembre y enero alerta en todos los segmentos.
+    la estacionalidad anual con drift: en noviembre y enero alerta en todos los segmentos;
+  - el chequeo de ticket usa `amount_total / total_transactions`, así que también se mueve con la tasa de promoción
+    (ver el hallazgo de conteos).
+
+## Promociones
+
+- **Método** (`causal/`):
+  - log-OLS con efectos fijos de serie y de fecha, absorbidos por proyecciones alternadas;
+  - errores agrupados por tienda, con t de 79 gl;
+  - inferencia por aleatorización y calibración A/A;
+  - las Wald conjuntas llevan la corrección de Hotelling.
+- **Balance:**
+  - la regla pre-registrada falla solo por `flag_conteo_inconsistente`, que es un resultado de la promoción;
+  - las pruebas de la asignación pasan todas (`asignacion_se_sostiene`, que excluye `balance.MEDICION`; la separación
+    se decidió después de ver datos).
+- **Resultado de E6** (`docs/specs/E6.md`; el diseño del próximo A/B, en `docs/causal_promos.md`):
+  - la promoción no mueve las unidades: +0.05 %, IC95 de −0.25 a +0.34 %;
+  - la excepción es Bebidas, con +1.45 %;
+  - no hay adelanto de compras ni efecto sobre otras categorías;
+  - con márgenes supuestos, ningún descuento de 5 a 20 % se paga.

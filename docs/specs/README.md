@@ -11,10 +11,10 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | [E3](E3.md) | Features, backtest y baselines | cerrada |
 | [E4](E4.md) | Modelos (LightGBM, Chronos-2) y validación robusta | cerrada |
 | [E5](E5.md) | Monitor de drift y reglas de decisión | cerrada |
-| E6 | Experimento de promociones | pendiente |
-| E7 | Servidor MCP, agentes y validador | pendiente |
-| E8 | Tablero | pendiente |
-| E9 | Empaquetado y documentación | pendiente |
+| [E6](E6.md) | Experimento de promociones | cerrada |
+| [E7](E7.md) | Servidor MCP, agentes y validador | pendiente |
+| [E8](E8.md) | Tablero | pendiente |
+| [E9](E9.md) | Empaquetado y documentación | pendiente |
 | E10 | Ensayo en limpio y publicación | pendiente |
 | E11 | `PROCESS.md` y contenido de la entrega (lo decide el usuario) | cerrada |
 

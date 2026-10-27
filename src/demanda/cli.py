@@ -287,6 +287,70 @@ def _drift(args: argparse.Namespace) -> None:
     print(f"escrito: {salida}")
 
 
+def _causal(args: argparse.Namespace) -> None:
+    from demanda.causal import etapa
+
+    cfg = get_config()
+    panel_path = cfg.interim_dir / "panel.parquet"
+    _requeridos((panel_path, "calidad"))
+    salida = cfg.artifacts_dir / "causal" / "promociones.json"
+    r = etapa.ejecutar(panel_path, salida, progreso=_progreso)
+    b = r["balance"]
+    print(
+        f"muestra: {r['muestra']['filas']:,} filas · {r['muestra']['series']} series · "
+        f"{r['muestra']['tiendas']} tiendas"
+    )
+    print(
+        f"balance: B1 p = {b['b1']['p_valor']:.3g} · B3 p = {b['b3']['p_valor']:.3g} · p de Holm mínima "
+        f"{b['familia']['p_holm_min']:.3g} en {b['familia']['n_pruebas']} pruebas · se sostiene: "
+        f"{'sí' if b['se_sostiene'] else 'no (' + ', '.join(b['fallan']) + ')'}"
+    )
+
+    def efecto(e: dict) -> str:
+        ic = e["ic95_pct"]
+        return f"{e['efecto_pct']:+.2f} % [{ic[0]:+.2f}, {ic[1]:+.2f}]  p = {e['p_valor']:.3g}"
+
+    e = r["efecto_principal"]
+    print(f"efecto principal: {efecto(e)} · por aleatorización p = {e['p_aleatorizacion']:.3g}")
+    aa = r["calibracion_aa"]
+    print(
+        f"A/A: {aa['tasa_pct']:.1f} % de rechazos (intervalo {aa['intervalo_99_pct'][0]:.1f} a "
+        f"{aa['intervalo_99_pct'][1]:.1f} %) · inferencia principal: {aa['inferencia_principal']}"
+    )
+    for nombre, c in r["canales"].items():
+        print(f"  canal {nombre:<32} {efecto(c)}")
+    for nombre, v in r["robustez"].items():
+        if "efecto_pct" in v:
+            print(f"  robustez {nombre:<29} {efecto(v)}")
+    for dimension in ("categoria", "formato"):
+        for g, v in r["heterogeneidad"][dimension]["grupos"].items():
+            print(f"  {dimension} {g:<30} {efecto(v)}  Holm {v['p_holm']:.3g}")
+    d = r["dinamica"]
+    print(f"dinámica: neto {efecto(d['neto'])} · adelanto: {'sí' if d['adelanto'] else 'no'}")
+    print(f"cruzado: {efecto(r['cruzado']['otras_categorias'])} · {r['cruzado']['interpretacion']}")
+    pot = r["potencia"]
+    sem = pot["diseno_semanal"]
+    print(
+        f"MDE diario: {pot['diseno_actual']['global']['mde_pct']:.2f} % · semanal "
+        f"({sem['semanas']} semanas): {sem['mde_actual']['mde_pct']:.2f} %"
+    )
+    print(
+        "  MDE semanal por W: "
+        + " · ".join(f"{f['semanas']}: {f['mde_pct']:.2f} %" for f in sem["por_semanas"])
+    )
+    print(
+        "  semanas para "
+        + ", ".join(f"{f['efecto_pct']:g} %: {f['semanas'] or '—'}" for f in sem["semanas_necesarias"])
+    )
+    for f in r["negocio"]["por_descuento"]:
+        print(
+            f"  descuento {100 * f['descuento']:.3g} % ({f['origen']}): "
+            + " · ".join(f"{v} {', '.join(f[v]) or '—'}" for v in ("se_paga", "no_se_paga", "indeterminado"))
+        )
+    print(r["conclusion"]["texto"])
+    print(f"escrito: {salida}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="demanda")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -327,6 +391,11 @@ def main(argv: list[str] | None = None) -> None:
         "drift", help="monitor de drift semana a semana, vigilancia del retador y validación"
     )
     p_drift.set_defaults(func=_drift)
+
+    p_causal = sub.add_parser(
+        "causal", help="experimento de promociones: balance, efecto, heterogeneidad, potencia y negocio"
+    )
+    p_causal.set_defaults(func=_causal)
 
     args = parser.parse_args(argv)
     try:

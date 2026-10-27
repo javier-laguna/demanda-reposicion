@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift lint format types test validate docker-build up
+.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal lint format types test validate docker-build up
 
 DATA_SRC ?=
 
@@ -36,6 +36,9 @@ decision:  ## newsvendor: políticas de reposición y su impacto, artifacts/deci
 
 drift:  ## monitor de drift semana a semana: artifacts/drift/monitor.json
 	uv run demanda drift
+
+causal:  ## experimento de promociones: artifacts/causal/promociones.json
+	uv run demanda causal
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

@@ -35,6 +35,7 @@ __marimo__/
 
 # Claude Code: configuración local
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 .DS_Store
 
