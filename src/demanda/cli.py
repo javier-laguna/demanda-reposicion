@@ -1,6 +1,7 @@
 """Punto de entrada: `uv run demanda <comando>`. Cada etapa del pipeline agrega aquí su comando."""
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -351,6 +352,44 @@ def _causal(args: argparse.Namespace) -> None:
     print(f"escrito: {salida}")
 
 
+def _insights(args: argparse.Namespace) -> None:
+    # Pydantic AI imprime un aviso de observabilidad en cada proceso; aquí solo es ruido en stderr
+    os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
+    from demanda.agentes import etapa
+
+    cfg = get_config()
+    r = etapa.ejecutar(cfg, args.modo, progreso=_progreso)
+    print(
+        f"modo: {r['modo']} (pedido: {r['modo_solicitado']}) · modelo: {r['modelo']} · "
+        f"prompts {r['prompt_version']}"
+    )
+    if r["aviso"]:
+        print(f"aviso: {r['aviso']}")
+    for dominio, d in r["dominios"].items():
+        v = d["validacion"]
+        estado = "ok" if v["valida"] else f"{len(v['rechazadas'])} rechazadas"
+        motivo = f" · {d['motivo']}" if d["motivo"] else ""
+        print(
+            f"  {dominio:<12} {d['origen']:<10} {len(d['insights'])} insights · {v['cifras']} cifras {estado}"
+            f" · reintentos {d['reintentos']}{motivo}"
+        )
+    if r["gasto"] is not None:
+        g = r["gasto"]
+        c = g["corrida"]
+        print(
+            f"gasto estimado: USD {c['costo_usd']:.4f} en {c['solicitudes']} solicitudes "
+            f"({c['tokens_entrada']:,} tokens de entrada, {c['tokens_salida']:,} de salida) · acumulado USD "
+            f"{g['acumulado_usd']:.4f} de {g['presupuesto_usd']:g}"
+        )
+    print(f"escrito: {cfg.artifacts_dir / 'insights' / 'insights.json'}")
+
+
+def _mcp(args: argparse.Namespace) -> None:
+    from demanda.mcp_server import servidor
+
+    servidor.servir(get_config().artifacts_dir, http=args.http, host=args.host, puerto=args.port)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="demanda")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -396,6 +435,25 @@ def main(argv: list[str] | None = None) -> None:
         "causal", help="experimento de promociones: balance, efecto, heterogeneidad, potencia y negocio"
     )
     p_causal.set_defaults(func=_causal)
+
+    p_insights = sub.add_parser(
+        "insights", help="interpreta los artefactos: agentes en vivo, caché o plantillas (insights.json)"
+    )
+    p_insights.add_argument(
+        "--modo",
+        choices=("auto", "vivo", "cache", "plantilla"),
+        default="auto",
+        help="auto: vivo si hay key, si no la caché (por omisión)",
+    )
+    p_insights.set_defaults(func=_insights)
+
+    p_mcp = sub.add_parser(
+        "mcp", help="servidor MCP de solo lectura sobre los artefactos (stdio por omisión)"
+    )
+    p_mcp.add_argument("--http", action="store_true", help="streamable HTTP en lugar de stdio")
+    p_mcp.add_argument("--host", default="127.0.0.1", help="con --http (en Docker, 0.0.0.0)")
+    p_mcp.add_argument("--port", type=int, default=8765, help="con --http")
+    p_mcp.set_defaults(func=_mcp)
 
     args = parser.parse_args(argv)
     try:

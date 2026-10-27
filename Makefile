@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal lint format types test validate docker-build up
+.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal insights mcp lint format types test validate docker-build up
 
 DATA_SRC ?=
+MODO ?=
 
 help:  ## lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -39,6 +40,12 @@ drift:  ## monitor de drift semana a semana: artifacts/drift/monitor.json
 
 causal:  ## experimento de promociones: artifacts/causal/promociones.json
 	uv run demanda causal
+
+insights:  ## agentes, caché o plantillas (MODO=auto|vivo|cache|plantilla): artifacts/insights/insights.json
+	uv run demanda insights $(if $(MODO),--modo $(MODO))
+
+mcp:  ## servidor MCP de solo lectura por stdio (HTTP en el 8765: uv run demanda mcp --http)
+	uv run demanda mcp
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

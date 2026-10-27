@@ -12,7 +12,7 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | [E4](E4.md) | Modelos (LightGBM, Chronos-2) y validación robusta | cerrada |
 | [E5](E5.md) | Monitor de drift y reglas de decisión | cerrada |
 | [E6](E6.md) | Experimento de promociones | cerrada |
-| [E7](E7.md) | Servidor MCP, agentes y validador | pendiente |
+| [E7](E7.md) | Servidor MCP, agentes y validador | cerrada |
 | [E8](E8.md) | Tablero | pendiente |
 | [E9](E9.md) | Empaquetado y documentación | pendiente |
 | E10 | Ensayo en limpio y publicación | pendiente |

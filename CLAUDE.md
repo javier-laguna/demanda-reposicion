@@ -38,6 +38,9 @@ make calibracion                    # campeón y retador en 8 orígenes previos 
 make decision                       # newsvendor: 3 políticas, impacto y sensibilidad → artifacts/decision/impacto.json (segundos)
 make drift                          # monitor semana a semana y drift inyectado → artifacts/drift/monitor.json (~15 s)
 make causal                         # experimento de promociones → artifacts/causal/promociones.json (~20 s)
+make insights                       # agentes: vivo con key, si no caché o plantillas → artifacts/insights/insights.json
+make insights MODO=vivo             # fuerza el modo vivo (~USD 0.4, ~2 min); actualiza insights/cache.json
+make mcp                            # servidor MCP de solo lectura por stdio (demanda mcp --http: 127.0.0.1:8765)
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
@@ -201,3 +204,26 @@ que las usa.
   - la excepción es Bebidas, con +1.45 %;
   - no hay adelanto de compras ni efecto sobre otras categorías;
   - con márgenes supuestos, ningún descuento de 5 a 20 % se paga.
+
+## Capa de agentes
+
+- **Servidor** (`mcp_server/`):
+  - FastMCP con 7 herramientas de solo lectura; las funciones puras están en `herramientas.py`;
+  - los agentes lo usan en proceso, con `MCPToolset` sobre la instancia.
+  - `get_forecast` no la usa ningún agente de `make insights`, porque devuelve series de una tienda.
+- **Agentes** (`agentes/`):
+  - `datos`, `pronostico` y `causal`, más un orquestador sin herramientas que recibe sus insights ya validados;
+  - el modelo es `LLM_MODEL`, por omisión `anthropic:claude-opus-5-5`, con `NativeOutput`, esfuerzo `medium` y sin
+    parámetros de muestreo (Opus 5.5 rechaza `temperature` y el `tool_choice` forzado).
+- **Validador:** una cifra solo pasa si aparece, con redondeo, en las respuestas de herramientas que el agente leyó
+  en esa corrida. Si falla, hay un reintento; si vuelve a fallar, se usa la plantilla.
+- **Caché:**
+  - `insights/cache.json`, el único derivado de los datos que se versiona;
+  - vale si coinciden la huella (respuestas redondeadas a 3 cifras significativas) y `PROMPT_VERSION`, y si sus
+    cifras se revalidan;
+  - un cambio de prompt exige subir `PROMPT_VERSION` y correr `make insights MODO=vivo`.
+- **Presupuesto:**
+  - un tope de USD 1 por corrida y uno acumulado de USD 20, en `artifacts/insights/gasto.json`;
+  - el límite duro va en la consola del proveedor.
+- **Tests:** nunca salen a la red (`ALLOW_MODEL_REQUESTS = False`), vacían las keys del entorno y apuntan
+  `DEMANDA_ENV_FILE` a un archivo inexistente, así que nunca leen el `.env` real.

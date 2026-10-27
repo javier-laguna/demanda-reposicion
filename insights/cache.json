@@ -1,0 +1,688 @@
+{
+  "descripcion": "Insights validados de la última corrida en vivo (make insights MODO=vivo). Solo conclusiones agregadas; make insights los usa sin key mientras la huella de los datos y los prompts coincidan.",
+  "dominios": {
+    "datos": {
+      "insights": [
+        {
+          "titulo": "La señal de reposición hace ver al sistema actual mejor de lo que es",
+          "hallazgo": "La señal fechada en un día ya incluye las ventas de ese día y mira un día al futuro. Al usarla de forma correcta, con el valor del día anterior, el error del sistema actual sube de 18.6 % a 20.1 %. Ese 20.1 % es la referencia válida para comparar cualquier modelo. Además, el sistema queda a solo 1.48 puntos de una media móvil de 7 días (21.6 %), así que en la práctica funciona como una media móvil.",
+          "evidencia": [
+            {
+              "cifra": "0.9454",
+              "que_mide": "correlación de la señal con la media móvil de ventas de 5 días antes a 1 día después",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "18.59 %",
+              "que_mide": "WAPE del sistema con la señal del mismo día (con fuga)",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "20.11 %",
+              "que_mide": "WAPE del sistema con la señal del día anterior y el factor ajustado (sin fuga)",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "1.52 pp",
+              "que_mide": "aumento del WAPE al quitar la fuga",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "21.59 %",
+              "que_mide": "WAPE de la media móvil de 7 días",
+              "herramienta": "get_eda_summary"
+            }
+          ],
+          "accion": "Comparar el modelo nuevo contra 20.1 %, no contra 18.6 %. En todo pronóstico hecho en el día T, usar solo la señal fechada en T−1 o antes.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "Los datos están casi completos y se excluyen huecos, no se rellenan",
+          "hallazgo": "De 204,000 filas esperadas faltan solo 42, en 3 bloques cortos de 2 a 3 días. Los nulos están dispersos, sin un patrón que sesgue el análisis. Las ventas faltan en el 3 % de las filas; esas filas se excluyen del entrenamiento y de la evaluación, sin imputarlas. La consecuencia es que no todos los puntos de pronóstico se pueden evaluar.",
+          "evidencia": [
+            {
+              "cifra": "42",
+              "que_mide": "filas faltantes en la malla tienda × categoría × día",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "204,000",
+              "que_mide": "filas esperadas",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "3.0 %",
+              "que_mide": "nulos en units_sold, con patrón disperso",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "5.94 %",
+              "que_mide": "nulos en cash_transactions y amount_cash",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "91,771 de 113,760",
+              "que_mide": "orígenes de pronóstico con los 7 días siguientes completos y con señal",
+              "herramienta": "get_eda_summary"
+            }
+          ],
+          "accion": "Reportar junto al error del pronóstico qué cobertura se evaluó. Mantener las marcas de fila faltante para que los huecos no se lean como días sin venta.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "En días de promoción el total de transacciones viene inflado",
+          "hallazgo": "Uno de cada cinco registros evaluables tiene más transacciones totales que la suma de efectivo y tarjeta, y la proporción es casi igual a la tasa de promociones. Esos días, el total cuenta registros sin pago, sin unidades y sin monto. El ticket promedio sí es correcto, porque siempre se calcula con el monto entre efectivo más tarjeta.",
+          "evidencia": [
+            {
+              "cifra": "19.96 %",
+              "que_mide": "registros con conteo inconsistente",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "19.98 %",
+              "que_mide": "tasa global de días con promoción",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "100.0 %",
+              "que_mide": "registros donde avg_ticket es igual al monto entre efectivo más tarjeta",
+              "herramienta": "get_data_quality"
+            }
+          ],
+          "accion": "Medir tráfico y conversión con efectivo más tarjeta, no con total_transactions. Dejar marcados los días inconsistentes en lugar de corregirlos.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "Los grandes eventos necesitan un seguimiento aparte",
+          "hallazgo": "Buen Fin multiplica la demanda por 2.65 y solo aparece una vez en los datos, así que su efecto no se puede validar con datos que el modelo no haya visto. En semanas con Buen Fin, el sistema sin fuga se equivoca 44.2 %, frente a 14.8 % en el resto de las semanas. El efecto del calendario es casi igual en todas las categorías.",
+          "evidencia": [
+            {
+              "cifra": "2.6453",
+              "que_mide": "multiplicador de la demanda en Buen Fin",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "44.23 %",
+              "que_mide": "WAPE del sistema sin fuga en semanas con Buen Fin",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "14.8 %",
+              "que_mide": "WAPE del sistema sin fuga fuera de Buen Fin y Navidad",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "4.08 %",
+              "que_mide": "diferencia del efecto de Buen Fin entre categorías",
+              "herramienta": "get_eda_summary"
+            }
+          ],
+          "accion": "Reportar el error en Buen Fin y Navidad por separado y planear esos eventos con revisión manual del inventario. Usar un modelo global con variables de calendario compartidas entre categorías.",
+          "confianza": "media"
+        }
+      ],
+      "modelo": "anthropic:claude-opus-5-5",
+      "prompt_version": "e7.2",
+      "prompts_sha256": "12ac7e5d8fc227ec7835d487f3b62e877d53b3f55988b3a64c4ecc645701cacb",
+      "llamadas": [
+        {
+          "herramienta": "get_data_quality",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_eda_summary",
+          "argumentos": {}
+        }
+      ],
+      "huella": "45313c9e36237d02aa365e5e54cbd7ae2c92bbbc133813146c1c360991b19736",
+      "artefactos_sha256": {
+        "calidad/reporte.json": "9f32050c90d52554c37a6671aa7cdf43b86a32262e471a7e56d0fbb179ab69da",
+        "eda/resumen.json": "f7416afc22b9c731df9efad9ee9f5bec1caaa0a17941e7a1b7253e2dbaaac0e8"
+      }
+    },
+    "pronostico": {
+      "insights": [
+        {
+          "titulo": "El sistema actual sigue como campeón; LightGBM queda en vigilancia",
+          "hallazgo": "LightGBM tiene el menor error semanal global: 20.3 % de WAPE, contra 27.3 % del sistema actual. Aun así no cumple la regla, porque esa diferencia no es estadísticamente significativa. En las semanas normales el sistema actual es incluso un poco mejor: 11.0 % contra 11.3 %. El resultado se mantiene en las 8 configuraciones de sensibilidad.",
+          "evidencia": [
+            {
+              "cifra": "20.3 %",
+              "que_mide": "WAPE semanal global de LightGBM",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "27.3 %",
+              "que_mide": "WAPE semanal global del sistema actual",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "0.166",
+              "que_mide": "p-valor de la prueba Diebold-Mariano de LightGBM contra el sistema actual (se exige menos de 0.05)",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "11.0 %",
+              "que_mide": "WAPE semanal del sistema actual en semanas normales",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "11.3 %",
+              "que_mide": "WAPE semanal de LightGBM en semanas normales",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "13",
+              "que_mide": "cortes que gana LightGBM, de 17 cortes cerrados",
+              "herramienta": "get_drift_alerts"
+            },
+            {
+              "cifra": "34",
+              "que_mide": "cortes que se necesitarían para que la ventaja fuera concluyente",
+              "herramienta": "get_drift_alerts"
+            }
+          ],
+          "accion": "Mantener el sistema actual como pronóstico oficial y seguir comparando a LightGBM cada semana. La ventaja de LightGBM se concentra en semanas de evento, no en las normales. Volver a evaluarlo cuando haya más cortes, sin cambiar de campeón antes de que la regla lo indique.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "Pedir con colchón (newsvendor) baja el costo y los quiebres",
+          "hallazgo": "Calcular el pedido con un colchón calibrado (política newsvendor) sobre el pronóstico del sistema actual cuesta 39.6 % menos que pedir exactamente lo pronosticado, y la diferencia es significativa. Los quiebres bajan de 12.8 % a 5.65 % de la demanda, pero el sobreinventario sube de 14.5 % a 34.1 %. Los montos dependen de márgenes y costos de mantener que son supuestos ilustrativos; lo que no cambia es el orden de las políticas en las 4 fracciones críticas probadas.",
+          "evidencia": [
+            {
+              "cifra": "39.6 % menos",
+              "que_mide": "costo del newsvendor con el sistema actual frente a pedir lo pronosticado",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "0.019",
+              "que_mide": "p-valor de la prueba de costo entre esas dos políticas",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "12.8 %",
+              "que_mide": "quiebre al pedir lo pronosticado",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "5.65 %",
+              "que_mide": "quiebre con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "94.4 %",
+              "que_mide": "fill rate (demanda surtida) con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "34.1 %",
+              "que_mide": "sobreinventario con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "9.3 %",
+              "que_mide": "costo menor del newsvendor con LightGBM frente al newsvendor con el sistema actual, no significativo (p = 0.196)",
+              "herramienta": "get_decision_impact"
+            }
+          ],
+          "accion": "Adoptar el newsvendor sobre el pronóstico del sistema actual. Validar con Finanzas los márgenes y costos de mantener por categoría antes de presentar los ahorros en pesos. Prever espacio en almacén para el inventario adicional.",
+          "confianza": "media"
+        },
+        {
+          "titulo": "Buen Fin y la semana siguiente necesitan un plan comercial",
+          "hallazgo": "En Buen Fin hay quiebres grandes incluso con el colchón: falta el 37.1 % de la demanda y solo se surte el 62.9 %. En la semana posterior pasa lo contrario: el pronóstico arrastra el pico y, con el sistema actual, el sobreinventario llega a 152 % de la demanda. Buen Fin ocurre una sola vez en los datos, así que este efecto no se puede validar fuera de muestra.",
+          "evidencia": [
+            {
+              "cifra": "37.1 %",
+              "que_mide": "quiebre en Buen Fin con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "62.9 %",
+              "que_mide": "fill rate en Buen Fin con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "152 %",
+              "que_mide": "sobreinventario la semana después de Buen Fin con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "101 %",
+              "que_mide": "sobreinventario la semana después de Buen Fin al pedir lo pronosticado",
+              "herramienta": "get_decision_impact"
+            }
+          ],
+          "accion": "Revisar con el área comercial los pedidos de Buen Fin y ajustarlos a mano a la baja en la semana siguiente, como indica el plan de evento del monitor. No depender solo del modelo en esas fechas.",
+          "confianza": "media"
+        },
+        {
+          "titulo": "Drift: casi todas las alertas son estacionalidad; las reales son de captura y promoción",
+          "hallazgo": "Las alertas de nivel de demanda de noviembre y enero, unas 19 por semana, vienen de una limitación conocida del monitor: confunde la estacionalidad anual con drift. No son una orden de reentrenar. Las alertas que sí piden acción son fallas de captura, como las tiendas sin datos STR_025 (2023-05-25) y STR_055 (2024-02-15), y un cambio en la tasa de promoción del formato Express (2023-10-12). El monitor detectó todos los escenarios de drift inyectados en su validación.",
+          "evidencia": [
+            {
+              "cifra": "19",
+              "que_mide": "alertas de nivel de demanda en cada semana de noviembre y enero",
+              "herramienta": "get_drift_alerts"
+            },
+            {
+              "cifra": "0",
+              "que_mide": "alertas de desempeño durante la calibración",
+              "herramienta": "get_drift_alerts"
+            },
+            {
+              "cifra": "3",
+              "que_mide": "recomendaciones de revisar captura en el backtest",
+              "herramienta": "get_drift_alerts"
+            }
+          ],
+          "accion": "No reentrenar por las alertas de noviembre y enero. Atender las fallas de captura con Sistemas y volver a estimar el efecto de las promociones en el formato Express. Pedir que el chequeo de nivel compare contra el mismo periodo del año anterior.",
+          "confianza": "alta"
+        }
+      ],
+      "modelo": "anthropic:claude-opus-5-5",
+      "prompt_version": "e7.2",
+      "prompts_sha256": "12ac7e5d8fc227ec7835d487f3b62e877d53b3f55988b3a64c4ecc645701cacb",
+      "llamadas": [
+        {
+          "herramienta": "get_decision_impact",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_drift_alerts",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_metrics",
+          "argumentos": {}
+        }
+      ],
+      "huella": "b84caca1770fd2227d9f5676b8408d395ec64496528ab0c83046f61800f6f788",
+      "artefactos_sha256": {
+        "backtest/metricas.json": "d2c419f3248f00088a7a3d4cdb51dc40ce0a8c379538d8d41250454b8bcf867c",
+        "decision/impacto.json": "0db0339a75f3fc8526c2801614ce3ec556cc29aa1860cb1bd36c6b0aeea0e6b7",
+        "drift/monitor.json": "ca2748fc415e0a7a76ccd4d361f6c2d73e63665c078ee3dd40cf78274a06a16f",
+        "modelos/seleccion.json": "a9fc31b96c14aedd5d87384b50d607a60e1d7f448a89c5b38a7e4d2929b99094"
+      }
+    },
+    "causal": {
+      "insights": [
+        {
+          "titulo": "Las promociones no aumentan las ventas en unidades",
+          "hallazgo": "En general, en los días con promoción no se venden más unidades. El efecto estimado es de apenas 0.05 % y no es significativo; el resultado se repite en todas las pruebas de robustez. Solo falla la prueba B5 del balance, pero mide cómo se registran los conteos, no cómo se asignaron las promociones. Las pruebas de la asignación pasan, así que el reparto de promociones se sostiene como aleatorio.",
+          "evidencia": [
+            {
+              "cifra": "0.05 %",
+              "que_mide": "efecto de la promoción sobre las unidades vendidas (conclusión formal)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "-0.25 % a 0.34 %",
+              "que_mide": "intervalo de confianza al 95 % del efecto sobre unidades",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.752",
+              "que_mide": "p-valor del efecto principal, con errores agrupados por tienda",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.09 %",
+              "que_mide": "efecto sobre unidades contando solo días normales, sin festivos ni temporadas (robustez)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "100 %",
+              "que_mide": "filas con promoción marcadas con conteo inconsistente (B5), frente a 0 % sin promoción",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.821",
+              "que_mide": "p-valor de la prueba B1 de balance de la asignación (pasa)",
+              "herramienta": "get_promo_effect"
+            }
+          ],
+          "accion": "Dejar de usar las promociones actuales para empujar volumen. No hay adelanto de compras ni efecto sobre otras categorías, así que tampoco se justifican por esa vía. Antes de lanzar nuevas campañas, revisar con las categorías qué objetivo persiguen.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "Bebidas es la excepción, pero con los descuentos simulados no se paga",
+          "hallazgo": "Bebidas es la única categoría con un efecto distinto de cero después de corregir por comparaciones múltiples: unas 1.45 % más unidades. Aun así, el pipeline concluye que ningún descuento de la rejilla (5 % a 20 %) se paga en ninguna categoría. Esa conclusión depende de dos supuestos: los márgenes y los descuentos que eligió el pipeline.",
+          "evidencia": [
+            {
+              "cifra": "1.45 %",
+              "que_mide": "efecto de la promoción sobre unidades en Bebidas",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.61 % a 2.31 %",
+              "que_mide": "intervalo de confianza al 95 % del efecto en Bebidas",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.0088",
+              "que_mide": "p-valor de Bebidas con la corrección de Holm",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "25 %",
+              "que_mide": "aumento de unidades que Bebidas necesitaría para pagar un descuento de 5 % (supuesto de margen de 25 %)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.3 %",
+              "que_mide": "descuento implícito que se observa en el precio por unidad; con él, Bebidas y Ropa quedan indeterminadas",
+              "herramienta": "get_promo_effect"
+            }
+          ],
+          "accion": "No extender descuentos de 5 % o más en ninguna categoría. Si el negocio quiere conservar promociones, que sean en Bebidas, con descuentos mínimos, y validar antes los márgenes reales con Finanzas, porque el veredicto depende de ese supuesto.",
+          "confianza": "media"
+        },
+        {
+          "titulo": "El aparente aumento de tráfico se debe a cómo se registran las transacciones",
+          "hallazgo": "Según el canal de transacciones totales, el tráfico sube 21.9 % con promoción, pero ese canal está contaminado: los días con promoción registra 1.22 veces la suma de efectivo más tarjeta. Medido con efectivo más tarjeta, el tráfico no cambia de forma significativa. El ingreso y el precio por unidad bajan ligeramente.",
+          "evidencia": [
+            {
+              "cifra": "1.22",
+              "que_mide": "transacciones totales entre efectivo más tarjeta en los días con promoción (1.00 sin promoción)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.12 %",
+              "que_mide": "menos tráfico medido con efectivo más tarjeta (canal secundario)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.132",
+              "que_mide": "p-valor del efecto sobre tráfico con efectivo más tarjeta (no significativo)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.25 %",
+              "que_mide": "menos ingreso (monto total) en días con promoción (canal secundario)",
+              "herramienta": "get_promo_effect"
+            }
+          ],
+          "accion": "No usar el indicador de transacciones totales para justificar promociones. Pedir a Sistemas que corrija cómo se registra ese conteo en los días con promoción, y mientras tanto reportar el tráfico como efectivo más tarjeta.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "Un experimento corto bastaría para detectar efectos relevantes",
+          "hallazgo": "El estudio tiene potencia para detectar efectos muy pequeños: con las 60 semanas de datos, un efecto de 0.42 % en la vista semanal. Un experimento nuevo, asignado por tienda, categoría y semana, detectaría un efecto de 2 % en 4 semanas y uno de 5 % en 2 semanas.",
+          "evidencia": [
+            {
+              "cifra": "0.42 %",
+              "que_mide": "efecto mínimo detectable en la vista semanal con 60 semanas",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "4",
+              "que_mide": "semanas necesarias para detectar un efecto de 2 %",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "2",
+              "que_mide": "semanas necesarias para detectar un efecto de 5 %",
+              "herramienta": "get_promo_effect"
+            }
+          ],
+          "accion": "Si se quiere probar otra mecánica de promoción, por ejemplo en Bebidas, correr una prueba de 4 semanas, con la promoción asignada al azar por tienda, categoría y semana, y medir en unidades.",
+          "confianza": "media"
+        }
+      ],
+      "modelo": "anthropic:claude-opus-5-5",
+      "prompt_version": "e7.2",
+      "prompts_sha256": "12ac7e5d8fc227ec7835d487f3b62e877d53b3f55988b3a64c4ecc645701cacb",
+      "llamadas": [
+        {
+          "herramienta": "get_promo_effect",
+          "argumentos": {}
+        }
+      ],
+      "huella": "7dc00cbc18f18aa5822dff5070e96b020f09d3ab9a4f41e8282fa2942816b261",
+      "artefactos_sha256": {
+        "causal/promociones.json": "1db83d7f8ae83e343e27f122dec264c7a052774c6c7e2f1868d2e3d76df790e7"
+      }
+    },
+    "orquestador": {
+      "insights": [
+        {
+          "titulo": "Mantener el sistema actual como pronóstico oficial y medirlo contra la referencia correcta",
+          "hallazgo": "La señal de reposición usaba ventas del mismo día. Sin esa fuga, el error diario del sistema actual sube de 18.6 % a 20.1 %, y 20.1 % es la vara válida para comparar cualquier modelo. LightGBM tiene menor error semanal global que el sistema actual (20.3 % frente a 27.3 %), pero la diferencia no es estadísticamente significativa. En semanas normales el sistema actual es incluso algo mejor (11.0 % frente a 11.3 %), así que la ventaja de LightGBM se concentra en semanas de evento. Faltan cortes para que la evidencia sea concluyente.",
+          "evidencia": [
+            {
+              "cifra": "18.59 %",
+              "que_mide": "WAPE del sistema con la señal del mismo día (con fuga)",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "20.11 %",
+              "que_mide": "WAPE del sistema sin fuga: referencia válida",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "20.3 %",
+              "que_mide": "WAPE semanal global de LightGBM",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "27.3 %",
+              "que_mide": "WAPE semanal global del sistema actual",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "0.166",
+              "que_mide": "p-valor de LightGBM contra el sistema actual (se exige menos de 0.05)",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "11.0 %",
+              "que_mide": "WAPE semanal del sistema actual en semanas normales",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "11.3 %",
+              "que_mide": "WAPE semanal de LightGBM en semanas normales",
+              "herramienta": "get_metrics"
+            },
+            {
+              "cifra": "13",
+              "que_mide": "cortes que gana LightGBM, de 17 cortes cerrados",
+              "herramienta": "get_drift_alerts"
+            },
+            {
+              "cifra": "34",
+              "que_mide": "cortes necesarios para que la ventaja fuera concluyente",
+              "herramienta": "get_drift_alerts"
+            }
+          ],
+          "accion": "Conservar el sistema actual como campeón, seguir comparando a LightGBM cada semana y no cambiar de campeón hasta que la regla lo indique. En todo pronóstico hecho en el día T, usar solo la señal de T−1 o antes. Reportar junto al error la cobertura evaluada, porque las filas sin ventas se excluyen y no se imputan.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "El mayor beneficio inmediato está en cómo se pide, no en cambiar de modelo",
+          "hallazgo": "Pedir con un colchón calibrado (newsvendor) sobre el pronóstico del sistema actual cuesta 39.6 % menos que pedir exactamente lo pronosticado, y la diferencia es significativa. Los quiebres bajan de 12.8 % a 5.65 % de la demanda, pero el sobreinventario sube a 34.1 %. Usar LightGBM en lugar del sistema actual dentro del newsvendor no da una mejora significativa. Los montos dependen de márgenes y costos de mantener que son supuestos ilustrativos; el orden de las políticas sí se mantiene.",
+          "evidencia": [
+            {
+              "cifra": "39.6 % menos",
+              "que_mide": "costo del newsvendor con el sistema actual frente a pedir lo pronosticado",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "0.019",
+              "que_mide": "p-valor de la prueba de costo entre ambas políticas",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "12.8 %",
+              "que_mide": "quiebre al pedir lo pronosticado",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "5.65 %",
+              "que_mide": "quiebre con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "94.4 %",
+              "que_mide": "demanda surtida con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "34.1 %",
+              "que_mide": "sobreinventario con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "9.3 %",
+              "que_mide": "costo menor del newsvendor con LightGBM frente al sistema actual, no significativo (p = 0.196)",
+              "herramienta": "get_decision_impact"
+            }
+          ],
+          "accion": "Adoptar el newsvendor sobre el pronóstico del sistema actual. Validar con Finanzas márgenes y costos de mantener por categoría antes de presentar ahorros en pesos, y prever espacio en almacén para el inventario adicional.",
+          "confianza": "media"
+        },
+        {
+          "titulo": "Las promociones actuales no venden más; el aumento de tráfico es un error de registro",
+          "hallazgo": "En días con promoción no se venden más unidades: el efecto es de apenas 0.05 % y no es significativo, y la asignación de promociones se sostiene como aleatoria. El supuesto aumento de tráfico viene de un conteo inflado: en días de promoción las transacciones totales son 1.22 veces efectivo más tarjeta, y uno de cada cinco registros es inconsistente. Bebidas es la única excepción (1.45 % más unidades), pero muy lejos del 25 % necesario para pagar un descuento de 5 %, bajo un margen supuesto que hay que validar.",
+          "evidencia": [
+            {
+              "cifra": "0.05 %",
+              "que_mide": "efecto de la promoción sobre unidades vendidas",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.752",
+              "que_mide": "p-valor del efecto principal",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "1.22",
+              "que_mide": "transacciones totales entre efectivo más tarjeta en días con promoción",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "19.96 %",
+              "que_mide": "registros con conteo de transacciones inconsistente",
+              "herramienta": "get_data_quality"
+            },
+            {
+              "cifra": "0.132",
+              "que_mide": "p-valor del efecto sobre tráfico medido con efectivo más tarjeta (no significativo)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "1.45 %",
+              "que_mide": "efecto de la promoción sobre unidades en Bebidas",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "0.0088",
+              "que_mide": "p-valor de Bebidas con corrección de Holm",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "25 %",
+              "que_mide": "aumento que Bebidas necesitaría para pagar un descuento de 5 % (margen supuesto de 25 %)",
+              "herramienta": "get_promo_effect"
+            },
+            {
+              "cifra": "4",
+              "que_mide": "semanas de experimento para detectar un efecto de 2 %",
+              "herramienta": "get_promo_effect"
+            }
+          ],
+          "accion": "Dejar de usar las promociones actuales para empujar volumen y no extender descuentos de 5 % o más. Medir tráfico con efectivo más tarjeta y pedir a Sistemas que corrija el conteo total. Si se quiere probar otra mecánica, por ejemplo en Bebidas, correr un experimento aleatorio de 4 semanas por tienda, categoría y semana, con márgenes validados por Finanzas.",
+          "confianza": "alta"
+        },
+        {
+          "titulo": "Buen Fin requiere plan manual, y el monitor no debe disparar reentrenamientos por estacionalidad",
+          "hallazgo": "Buen Fin multiplica la demanda por 2.65 y el error del sistema sube a 44.2 %, frente a 14.8 % en semanas normales. Aun con colchón falta el 37.1 % de la demanda, y la semana siguiente el sobreinventario llega a 152 %. Buen Fin aparece una sola vez en los datos, así que este efecto no se puede validar fuera de muestra. Las cerca de 19 alertas semanales de noviembre y enero son estacionalidad mal leída por el monitor; las alertas reales son fallas de captura y un cambio de promoción en el formato Express.",
+          "evidencia": [
+            {
+              "cifra": "2.6453",
+              "que_mide": "multiplicador de la demanda en Buen Fin",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "44.23 %",
+              "que_mide": "WAPE del sistema sin fuga en semanas con Buen Fin",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "14.8 %",
+              "que_mide": "WAPE del sistema sin fuga fuera de Buen Fin y Navidad",
+              "herramienta": "get_eda_summary"
+            },
+            {
+              "cifra": "37.1 %",
+              "que_mide": "quiebre en Buen Fin con newsvendor y el sistema actual",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "152 %",
+              "que_mide": "sobreinventario la semana después de Buen Fin con newsvendor",
+              "herramienta": "get_decision_impact"
+            },
+            {
+              "cifra": "19",
+              "que_mide": "alertas de nivel de demanda por semana en noviembre y enero",
+              "herramienta": "get_drift_alerts"
+            },
+            {
+              "cifra": "3",
+              "que_mide": "recomendaciones de revisar captura en el backtest",
+              "herramienta": "get_drift_alerts"
+            }
+          ],
+          "accion": "Planear Buen Fin y Navidad con el área comercial y revisión manual del inventario, ajustando a la baja la semana siguiente, y reportar su error por separado. No reentrenar por las alertas de noviembre y enero. Atender con Sistemas las fallas de captura (STR_025 el 2023-05-25 y STR_055 el 2024-02-15), reestimar las promociones en Express y pedir que el monitor compare contra el mismo periodo del año anterior.",
+          "confianza": "media"
+        }
+      ],
+      "modelo": "anthropic:claude-opus-5-5",
+      "prompt_version": "e7.2",
+      "prompts_sha256": "12ac7e5d8fc227ec7835d487f3b62e877d53b3f55988b3a64c4ecc645701cacb",
+      "llamadas": [
+        {
+          "herramienta": "get_data_quality",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_decision_impact",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_drift_alerts",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_eda_summary",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_metrics",
+          "argumentos": {}
+        },
+        {
+          "herramienta": "get_promo_effect",
+          "argumentos": {}
+        }
+      ],
+      "huella": "336d9f75a15d296e669fe6ad7f0c7ab01b06e90ff75d1bcfaeebaf008130d9a0",
+      "artefactos_sha256": {
+        "backtest/metricas.json": "d2c419f3248f00088a7a3d4cdb51dc40ce0a8c379538d8d41250454b8bcf867c",
+        "calidad/reporte.json": "9f32050c90d52554c37a6671aa7cdf43b86a32262e471a7e56d0fbb179ab69da",
+        "causal/promociones.json": "1db83d7f8ae83e343e27f122dec264c7a052774c6c7e2f1868d2e3d76df790e7",
+        "decision/impacto.json": "0db0339a75f3fc8526c2801614ce3ec556cc29aa1860cb1bd36c6b0aeea0e6b7",
+        "drift/monitor.json": "ca2748fc415e0a7a76ccd4d361f6c2d73e63665c078ee3dd40cf78274a06a16f",
+        "eda/resumen.json": "f7416afc22b9c731df9efad9ee9f5bec1caaa0a17941e7a1b7253e2dbaaac0e8",
+        "modelos/seleccion.json": "a9fc31b96c14aedd5d87384b50d607a60e1d7f448a89c5b38a7e4d2929b99094"
+      },
+      "entradas_de_dominio": {
+        "datos": "2f9ca75360a296d6974cfec816190af4339e4995a4bef25bfddda7f478386bfd",
+        "pronostico": "96995fe401631bc951603329b261f6cfdadbd8f31f383adde654c27197a824fb",
+        "causal": "e72075be7704e343cb55b36b10a38249d664b44d6b26e0884f8aa83b02164780"
+      }
+    }
+  }
+}

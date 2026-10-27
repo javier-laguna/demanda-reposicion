@@ -276,3 +276,49 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
     dataset resultó ser la huella de la promoción en el registro.
   - El efecto nulo no basta como respuesta de negocio. Lo que decide es que el IC completo queda lejos del lift de
     equilibrio.
+
+### E7 · Servidor MCP, agentes y validador
+
+- **Qué se hizo:**
+  - un servidor MCP (FastMCP) con 7 herramientas de solo lectura sobre los artefactos;
+  - tres agentes de dominio (datos, pronóstico y promociones) y un orquestador en Pydantic AI, con Anthropic por
+    defecto y el proveedor configurable;
+  - un validador determinista de cifras;
+  - una caché versionada con huella;
+  - plantillas para correr sin key;
+  - un freno de gasto.
+- **Resultado:**
+  - con Opus 5.5, una corrida completa cuesta ~USD 0.4 y tarda ~2 min. Las 183 cifras de los cuatro dominios pasan
+    el validador sin reintentos;
+  - sin key, el mismo comando usa la caché y da el mismo resultado en cada corrida.
+- **Cómo se usó la IA:**
+  - **Claude Code escribió la spec**, incluida la regla de que una cifra solo vale si el agente la leyó en una
+    herramienta en esa corrida, y la huella de la caché con redondeo, para que valga entre plataformas.
+    - Antes leyó el código instalado de Pydantic AI para confirmar cómo maneja las restricciones de Opus 5.5 (sin
+      `tool_choice` forzado ni `temperature`).
+  - **La key de Anthropic es mía.**
+  - **La implementación la hizo un agente general.** Gastó una de las tres corridas en vivo permitidas.
+  - **La verificación usó un validador propio**, independiente del código del repo: encontró en los artefactos los
+    161 números de la caché.
+  - **La lectura del texto encontró dos cosas que el validador no puede ver:**
+    - el agente de datos repetía una interpretación de E1 que E6 había corregido;
+    - el orquestador citaba cifras sin redondear.
+
+    Se corrigieron los prompts (versión `e7.2`) y se repitió la corrida. Es la limitación declarada del validador:
+    comprueba que la cifra exista, no que la frase la use bien.
+  - **La revisión la hizo otro agente** con las instrucciones de `reviewer`, con pruebas de mutación. Encontró
+    huecos reales en la primera versión:
+    - el validador no revisaba cifras pegadas a una coma o a un guion: «15,7 %» pasaba como «15»;
+    - probar siempre la conversión a % dejaba pasar «302.35 %» por un 3.02;
+    - la caché se invalidaba sola tras un reintento;
+    - el resumen del orquestador podía quedar mezclado con dominios de otra corrida;
+    - sobrevivían 18 de 45 mutaciones.
+
+    Tras los arreglos, y una tercera corrida en vivo para regenerar la caché, mueren 49 de 51. Las 2 restantes son
+    equivalentes.
+  - **El validador sigue siendo permisivo,** y se dejó medido: un porcentaje inventado con un decimal pasa 13–15 %
+    de las veces por coincidencia con algún valor real (30 % en el orquestador, que lee más cifras). Atrapa la
+    invención burda y la cifra derivada, no la coincidencia.
+- **Qué enseñó:**
+  - Un validador de cifras atrapa la invención, pero no la interpretación vieja. Hace falta leer lo que escriben los
+    agentes, y versionar los prompts para que la caché se invalide cuando cambian.

@@ -1,13 +1,24 @@
-"""Configuración del proyecto: rutas, MLflow y proveedor LLM, leídos de variables de entorno o de `.env`."""
+"""Configuración del proyecto: rutas, MLflow y proveedor LLM, leídos de variables de entorno o de `.env`.
 
+`DEMANDA_ENV_FILE` cambia el archivo `.env` que se lee (por omisión, el de la raíz del repo). Las pruebas
+la apuntan a una ruta inexistente, así nunca leen las keys reales.
+"""
+
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings.sources import ENV_FILE_SENTINEL
 
 RAIZ = Path(__file__).resolve().parents[2]
+
+
+def env_file() -> Path:
+    """El `.env` que lee la config: `DEMANDA_ENV_FILE` si está definida, si no `RAIZ/.env`."""
+    return Path(os.environ.get("DEMANDA_ENV_FILE") or RAIZ / ".env")
 
 
 def _mlflow_por_defecto(campos: dict[str, Any]) -> str:
@@ -28,11 +39,24 @@ class Config(BaseSettings):
     )
 
     # Capa de agentes. `llm_model` usa la notación de Pydantic AI (`proveedor:modelo`). Sin key se usa la
-    # caché de insights o, si no coincide, las plantillas.
-    llm_model: str = "anthropic:claude-sonnet-5-5"
+    # caché de insights o, si no coincide, las plantillas. `llm_base_url` es para el proveedor `openai`
+    # (un gateway compatible con su API).
+    llm_model: str = "anthropic:claude-opus-5-5"
     llm_base_url: str | None = None
     anthropic_api_key: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    # Freno de gasto propio (el límite duro va en la consola del proveedor): el modo vivo no arranca si el
+    # gasto acumulado de la máquina llega a `llm_presupuesto_usd`, y una corrida se corta al pasar
+    # `llm_tope_corrida_usd`. Ambos en USD estimados con la tabla de precios de `agentes/proveedor.py`.
+    llm_presupuesto_usd: float = 20.0
+    llm_tope_corrida_usd: float = 1.0
+
+    def __init__(self, _env_file: Any = ENV_FILE_SENTINEL, **valores: Any) -> None:
+        # La ruta se resuelve al crear la config, no al importar el módulo; un `_env_file` explícito gana
+        if _env_file is ENV_FILE_SENTINEL:
+            _env_file = env_file()
+        super().__init__(_env_file=_env_file, **valores)
 
     @property
     def raw_dir(self) -> Path:
