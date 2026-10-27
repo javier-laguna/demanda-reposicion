@@ -1,6 +1,6 @@
 ---
 name: causal-analyst
-description: Analista causal del repo. Úsalo para el experimento de promociones (src/demanda/causal y docs/causal_promos.md): balance, efecto, heterogeneidad y potencia.
+description: "Analista causal del repo. Úsalo para el experimento de promociones (src/demanda/causal y docs/causal_promos.md): balance, efecto, heterogeneidad y potencia."
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
