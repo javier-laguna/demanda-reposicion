@@ -13,7 +13,7 @@ usó la IA. Se escribió al cerrar cada etapa del plan (`docs/specs/README.md`).
 | Seguimiento | MLflow local con SQLite _(E3)_ |
 | Capa de IA | Pydantic AI, con Anthropic por defecto y proveedor configurable; servidor MCP con FastMCP _(E7)_ |
 | Entrega | Streamlit _(E8)_, Docker Compose, GitHub Actions |
-| Asistente de desarrollo | Claude Code (Claude Opus 5.5) con subagentes, skills y servidores MCP de documentación |
+| Asistente de desarrollo | Claude Code (Claude Opus 5.5) con subagentes y skills |
 
 ## Cómo se usó la IA
 
@@ -32,6 +32,74 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
    conclusiones de negocio. Tiene tres límites: no calcula ni decide, solo lee vía un servidor MCP, y un validador
    determinista comprueba cada cifra que cita contra los artefactos. Funciona con cualquier proveedor y también sin
    key: en ese caso usa la caché versionada o conclusiones generadas con plantillas.
+
+## Cómo se organizó el trabajo con Claude Code
+
+### Plan antes de código
+
+- **Primero, los datos.** La sesión empezó con `/init` para el `CLAUDE.md` y con un perfilado de los datos en scripts
+  desechables. No se propuso ningún plan antes de eso.
+- **El plan se hizo en modo plan**, donde Claude Code solo lee y propone, sin tocar archivos, hasta que se aprueba.
+  - Antes de cerrarlo me preguntó lo que solo yo podía decidir: el flujo de git (commits directos en `main`, sin PRs)
+    y si se podía versionar la caché de conclusiones del LLM (sí, solo agregados por segmento).
+  - El plan aprobado dividió el trabajo en 11 etapas, de E0 a E10, con horas estimadas, un orden de recortes por si
+    había atraso y un protocolo de cierre por etapa. E11 la agregué después, para decidir yo el contenido de este
+    documento y de la entrega.
+
+### Una etapa, una spec, una ventana de contexto
+
+- **Cada etapa tiene su spec** en `docs/specs/`, escrita por Claude Code al empezarla: objetivo, entregables,
+  criterios de aceptación y, en las de modelado, las reglas de decisión con sus umbrales. Al cerrar, la spec recibe
+  su sección *Resultado*.
+- **El cierre sigue un protocolo fijo** (`docs/specs/README.md`):
+  1. `make validate` y pre-commit en verde;
+  2. revisión independiente del diff;
+  3. documentación: la spec, la tabla de estado y la bitácora de abajo;
+  4. el commit, que Claude Code propone y hace solo con mi aprobación (lo mismo para el push);
+  5. la compactación del contexto.
+- **`CLAUDE.md` es la memoria del proyecto.** Cada etapa le agregó sus hallazgos y sus cifras verificadas. Así, una
+  sesión nueva, o quien revise el repo, arranca con el estado real y no con el del plan.
+
+### Compactaciones
+
+- **Cada etapa se acotó para caber en una ventana de contexto.** Al cerrarla, Claude Code me pasaba el comando de
+  compactación con lo que había que conservar, y yo lo corría. Un ejemplo, abreviado:
+
+  ```
+  /compact Cerrada E3. Conservar: 17 cortes semanales (jueves 2023-11-02 a 2024-02-22, h=1..7); métrica principal
+  WAPE semanal; vara: sistema actual 27.3 % global y 11.0 % en semanas normales. Siguiente: E4; escribir
+  docs/specs/E4.md.
+  ```
+- **Al retomar**, lo primero era leer `CLAUDE.md`, el estado de las etapas y la spec siguiente, antes de tocar código.
+- **Hubo seis compactaciones manuales**, una al cierre de cada etapa de E0 a E5, y dos automáticas al final.
+- **De E6 a E10 no hizo falta compactar:** el trabajo pesado lo hicieron subagentes en segundo plano, y a la sesión
+  principal solo regresaban sus informes.
+
+### Subagentes de desarrollo
+
+- **`.claude/agents/` define cuatro:** tres implementadores por dominio (`eda-analyst`, `forecast-engineer` y
+  `causal-analyst`) y un revisor de solo lectura (`reviewer`). Cada uno arranca leyendo `CLAUDE.md` y la spec activa.
+- **Se usaron como instrucciones, no por nombre.** Claude Code registra esos archivos al iniciar la sesión, y se
+  crearon a la mitad. Por eso cada etapa lanzó un agente general con el contenido del archivo como prompt. En una
+  sesión nueva ya se invocan por nombre.
+- **El patrón por etapa, de E3 a E9:**
+  - un agente implementa la spec en segundo plano;
+  - otro agente, sin el contexto del primero, revisa el diff y pone a prueba las pruebas con mutaciones;
+  - los hallazgos regresan al implementador por mensaje, para que corrija con su propio contexto. En E6 y E7 el
+    revisor verificó también las correcciones;
+  - la sesión principal no se queda con los informes: recalcula las cifras centrales con scripts propios, escritos
+    desde la spec y no desde el código del agente. Esos scripts vivieron fuera del repo.
+- **En total fueron 18 agentes:** 3 de investigación antes de E0, uno para el EDA y un par implementador–revisor en
+  cada etapa de E3 a E9.
+
+### Otras herramientas
+
+- **Skills:** archify, para los diagramas de arquitectura, y claude-api, para elegir el modelo y sus parámetros en E7.
+- **Tareas en segundo plano** para lo que tarda: el backtest (~19 min), el pipeline completo y los agentes. Claude Code
+  sigue trabajando y recibe un aviso cuando terminan.
+- **La memoria persistente de Claude Code** guardó preferencias que no pertenecen al repo, como que el contenido de
+  este documento lo decido yo.
+- **Permisos:** Claude Code no hizo commits ni push sin mi aprobación.
 
 ## Bitácora
 

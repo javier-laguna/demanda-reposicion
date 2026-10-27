@@ -36,6 +36,11 @@ Más detalle en la [model card](docs/model_card.md). Lo que cambiaría para prod
 Los datos de la prueba **no** están en el repo. Se colocan localmente a partir del zip o la carpeta de la prueba, y
 se verifican contra `data/manifest.sha256`.
 
+```bash
+git clone https://github.com/javier-laguna/demanda-reposicion.git
+cd demanda-reposicion
+```
+
 ### Con uv y make
 
 Requisitos: [uv](https://docs.astral.sh/uv/) y GNU Make. Python 3.13 lo instala uv.
@@ -140,3 +145,7 @@ nada:** la solución corre solo con uv y make, o con Docker.
   relativo por las librerías numéricas. Las conclusiones no cambian, y la caché de insights sigue valiendo porque su
   huella redondea a 3 cifras significativas.
 - Secretos solo en `.env` (gitignored), leídos como `SecretStr`. gitleaks corre en pre-commit y en CI.
+
+## Licencia
+
+MIT. Ver [`LICENSE`](LICENSE).
