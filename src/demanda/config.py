@@ -31,6 +31,8 @@ class Config(BaseSettings):
     data_dir: Path = RAIZ / "data"
     artifacts_dir: Path = RAIZ / "artifacts"
     reports_dir: Path = RAIZ / "reports"
+    # Los diagramas de archify; el tablero muestra el de la carpeta más reciente
+    archify_dir: Path = RAIZ / ".archify"
     # Por defecto vive junto a los artefactos, así nada del backtest se escribe fuera de `artifacts_dir`.
     # Se lee de una variable propia: la estándar, `MLFLOW_TRACKING_URI`, puede apuntar a un servidor
     # remoto en el shell

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal insights mcp lint format types test validate docker-build up
+.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift causal insights mcp app lint format types test validate docker-build up
 
 DATA_SRC ?=
 MODO ?=
@@ -46,6 +46,9 @@ insights:  ## agentes, caché o plantillas (MODO=auto|vivo|cache|plantilla): art
 
 mcp:  ## servidor MCP de solo lectura por stdio (HTTP en el 8765: uv run demanda mcp --http)
 	uv run demanda mcp
+
+app:  ## tablero en Streamlit en http://127.0.0.1:8501 (solo lee artifacts/)
+	uv run demanda app
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

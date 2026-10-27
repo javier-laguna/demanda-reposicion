@@ -41,6 +41,7 @@ make causal                         # experimento de promociones → artifacts/c
 make insights                       # agentes: vivo con key, si no caché o plantillas → artifacts/insights/insights.json
 make insights MODO=vivo             # fuerza el modo vivo (~USD 0.4, ~2 min); actualiza insights/cache.json
 make mcp                            # servidor MCP de solo lectura por stdio (demanda mcp --http: 127.0.0.1:8765)
+make app                            # tablero Streamlit en http://127.0.0.1:8501 (solo lee artefactos)
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
@@ -227,3 +228,13 @@ que las usa.
   - el límite duro va en la consola del proveedor.
 - **Tests:** nunca salen a la red (`ALLOW_MODEL_REQUESTS = False`), vacían las keys del entorno y apuntan
   `DEMANDA_ENV_FILE` a un archivo inexistente, así que nunca leen el `.env` real.
+
+## Tablero
+
+- **Estructura** (`app/`): `principal.py` (navegación), `datos.py` (lectura cacheada por la config), `graficas.py`
+  (funciones puras a Altair) y `paginas/`, con 7 páginas.
+- **No recalcula nada:** toda cifra sale tal cual de un artefacto. La única cuenta propia es el cruce semana × capa
+  de las alertas.
+- **Del panel lee solo las columnas de tienda,** y no muestra filas más allá de la serie elegida.
+- **El diagrama de Arquitectura** es la carpeta de `.archify/` con el sello de fecha más reciente.
+- **Tests:** AppTest sobre artefactos sintéticos; también buscan los textos de límites obligatorios.

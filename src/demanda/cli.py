@@ -10,6 +10,8 @@ from demanda.config import RAIZ, get_config
 from demanda.datos import calidad, fuente
 
 NOTEBOOK_EDA = RAIZ / "notebooks" / "eda.py"
+# No se importa: es el script que corre `streamlit run`
+TABLERO = Path(__file__).resolve().parent / "app" / "principal.py"
 
 
 def _data(args: argparse.Namespace) -> None:
@@ -390,6 +392,34 @@ def _mcp(args: argparse.Namespace) -> None:
     servidor.servir(get_config().artifacts_dir, http=args.http, host=args.host, puerto=args.port)
 
 
+def _app(args: argparse.Namespace) -> None:
+    # Sin abrir el navegador ni mandar telemetría: el tablero se abre en la URL que imprime Streamlit
+    comando = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(TABLERO),
+        "--server.port",
+        str(args.port),
+        "--server.address",
+        args.host,
+        "--server.headless",
+        "true",
+        "--browser.gatherUsageStats",
+        "false",
+        # Sin las opciones de desarrollo (el botón «Deploy»): el tablero es para leer
+        "--client.toolbarMode",
+        "minimal",
+    ]
+    try:
+        codigo = subprocess.run(comando, check=False).returncode
+    except KeyboardInterrupt:  # Ctrl+C detiene a Streamlit; no es un error
+        codigo = 0
+    if codigo:
+        raise SystemExit(codigo)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="demanda")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -454,6 +484,11 @@ def main(argv: list[str] | None = None) -> None:
     p_mcp.add_argument("--host", default="127.0.0.1", help="con --http (en Docker, 0.0.0.0)")
     p_mcp.add_argument("--port", type=int, default=8765, help="con --http")
     p_mcp.set_defaults(func=_mcp)
+
+    p_app = sub.add_parser("app", help="tablero en Streamlit sobre los artefactos (solo lectura)")
+    p_app.add_argument("--host", default="127.0.0.1", help="en Docker, 0.0.0.0")
+    p_app.add_argument("--port", type=int, default=8501)
+    p_app.set_defaults(func=_app)
 
     args = parser.parse_args(argv)
     try:

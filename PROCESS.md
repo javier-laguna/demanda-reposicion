@@ -322,3 +322,23 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
 - **Qué enseñó:**
   - Un validador de cifras atrapa la invención, pero no la interpretación vieja. Hace falta leer lo que escriben los
     agentes, y versionar los prompts para que la caché se invalide cuando cambian.
+
+### E8 · Tablero
+
+- **Qué se hizo:** un tablero Streamlit de 7 páginas que solo lee artefactos: resumen, datos, modelos, pronóstico por
+  tienda, decisión y drift, promociones y arquitectura.
+- **Resultado:** las 7 páginas cargan con los artefactos reales en tema claro y oscuro. Los límites que la spec exige
+  mostrar se ven como texto y tienen prueba.
+- **Cómo se usó la IA:**
+  - **Claude Code escribió la spec. La implementación la hizo un agente general.**
+  - **Claude Code revisó el tablero con capturas,** con Playwright sobre el Chrome instalado, en claro y en oscuro.
+    De ahí salieron dos ajustes:
+    - los colores de real y campeón se confundían;
+    - sobraba el botón de despliegue de Streamlit.
+  - **La revisión la hizo otro agente** con las instrucciones de `reviewer`, con pruebas de mutación. No encontró
+    errores funcionales, pero sí pruebas débiles: sobrevivían 19 de 35 mutaciones. Entre ellas, quitar los textos de
+    límites o dejar ver filas de otras series.
+  - **Tras agregar las pruebas,** Claude Code repitió las mutaciones con el script del revisor sobre una copia limpia,
+    y mueren las 34 que aplican.
+- **Qué enseñó:** en un tablero, que una página «cargue sin error» no prueba casi nada. Las pruebas útiles fijan lo
+  que debe verse y lo que no.

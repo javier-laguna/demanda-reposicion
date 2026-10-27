@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -1067,3 +1068,127 @@ def simulado() -> SimpleNamespace:
         inventa_y_corrige=inventa_y_corrige,
         inventada=INVENTADA,
     )
+
+
+# --- E8: artefactos sintéticos para el tablero ----------------------------------------------------------
+
+
+class ArtefactosApp(NamedTuple):
+    artefactos: Path
+    datos: Path
+    archify: Path
+
+
+def _editar_json(ruta: Path, cambio) -> None:
+    contenido = json.loads(ruta.read_text())
+    cambio(contenido)
+    ruta.write_text(json.dumps(contenido, indent=2, ensure_ascii=False))
+
+
+def _promociones_app(p: dict) -> None:
+    coeficiente = _estimacion_e7(0.0142966, (-0.28136, 0.31083), 0.923674)
+    p["dinamica"]["coeficientes"] = {"t": coeficiente, "t-1": _estimacion_e7(-0.146646, (-0.5, 0.21), 0.42)}
+    p["heterogeneidad"]["formato"] = {
+        "grupos": {
+            "Bodega": _estimacion_e7(0.1, (-0.4, 0.6), 0.7),
+            "Express": _estimacion_e7(-0.2, (-0.9, 0.5), 0.6),
+        },
+        "igualdad": {"p_valor": 0.41, "hay_heterogeneidad": False},
+    }
+
+
+def _monitor_app(m: dict) -> None:
+    """Una alerta esperada de entradas en el primer corte (la de calidad está en el segundo) y los agregados
+    de `resumen` que el tablero lee, escritos a mano para que coincidan con esas dos alertas."""
+    m["semanas"][1]["alertas"] = [
+        {
+            "capa": "entradas",
+            "chequeo": "nivel_demanda",
+            "segmento": "region",
+            "nivel": "Centro",
+            "modelo": None,
+            "medida": "psi",
+            "valor": 0.31,
+            "referencia": 0.0,
+            "umbral": 0.25,
+            "p_valor": None,
+            "severidad": "alerta",
+            "clasificacion": "esperada",
+            "cuando": "al_cerrar",
+        }
+    ]
+    vacio = {"semanas_evaluadas": 1, "alertas": 0, "inesperadas": 0, "esperadas": 0, "vigilar": 0}
+    for periodo in ("calibracion", "backtest"):
+        m["resumen"][periodo]["por_chequeo"] = {
+            "tienda_sin_datos": {"capa": "calidad", **vacio},
+            "nivel_demanda": {"capa": "entradas", **vacio},
+        }
+    m["resumen"]["por_semana"] = [
+        {
+            "origen": s["origen"],
+            "periodo": s["periodo"],
+            "evento": s["evento"],
+            "dia_especial": False,
+            "inesperadas": inesperadas,
+            "esperadas": esperadas,
+            "vigilar": 0,
+            "recomendaciones": [r["codigo"] for r in s["recomendaciones"]],
+        }
+        for s, (inesperadas, esperadas) in zip(m["semanas"], ((0, 0), (0, 1), (1, 0)), strict=True)
+    ]
+
+
+def escribir_artefactos_app(raiz: Path) -> ArtefactosApp:
+    """Lo que lee el tablero, con la forma de lo real y pocas cifras.
+
+    - Los artefactos de E7, más lo que el tablero lee y las herramientas MCP no: los eventos por corte del
+      backtest, la definición de la fracción crítica objetivo, la dinámica y la heterogeneidad por formato de
+      E6, y los agregados del monitor, con una alerta en otra capa.
+    - `insights.json` en modo plantilla, sin red.
+    - El panel completo de dos tiendas, con las transacciones: del panel, el tablero solo lee la tienda.
+    - Una carpeta de archify con tres corridas: la del sello más reciente no tiene HTML, así que se muestra la
+      segunda. La primera se modificó al final, para que elegir por fecha de modificación falle."""
+    from demanda.agentes import etapa
+    from demanda.config import Config
+
+    artefactos = escribir_artefactos_e7(raiz / "artifacts")
+    _editar_json(
+        artefactos / "backtest" / "metricas.json",
+        lambda m: m["protocolo"].update(
+            evento_por_corte=dict(zip(ORIGENES_E7, ("resto", "buen_fin"), strict=True))
+        ),
+    )
+    _editar_json(
+        artefactos / "decision" / "impacto.json",
+        lambda d: d["definiciones"].update(fc_objetivo_pct="la fracción crítica media de los pares"),
+    )
+    _editar_json(artefactos / "causal" / "promociones.json", _promociones_app)
+    _editar_json(artefactos / "drift" / "monitor.json", _monitor_app)
+    etapa.ejecutar(
+        Config(_env_file=None, artifacts_dir=artefactos), "plantilla", cache_path=raiz / "sin.json"
+    )
+
+    datos = raiz / "data"
+    (datos / "interim").mkdir(parents=True)
+    panel.construir(generar(n_tiendas=2)).write_parquet(datos / "interim" / "panel.parquet")
+
+    archify = raiz / "archify"
+    for carpeta, html in (
+        ("architecture-solucion-20260101-120000", "antes.html"),
+        ("architecture-solucion-20260201-120000", "solucion.html"),
+        ("architecture-solucion-20260301-120000", None),
+    ):
+        (archify / carpeta).mkdir(parents=True)
+        (archify / carpeta / "candidate.json").write_text("{}")
+        if html is not None:
+            (archify / carpeta / html).write_text(f"<!DOCTYPE html><html><body><h1>{html}</h1></body></html>")
+    futuro = time.time() + 86_400
+    for ruta in (archify / "architecture-solucion-20260101-120000").iterdir():
+        os.utime(ruta, (futuro, futuro))
+    os.utime(archify / "architecture-solucion-20260101-120000", (futuro, futuro))
+    return ArtefactosApp(artefactos, datos, archify)
+
+
+@pytest.fixture(scope="session")
+def artefactos_app(tmp_path_factory) -> ArtefactosApp:
+    return escribir_artefactos_app(tmp_path_factory.mktemp("app"))
