@@ -43,7 +43,7 @@ Requisitos: [uv](https://docs.astral.sh/uv/) y GNU Make. Python 3.13 lo instala 
 ```bash
 make setup                              # ambiente (uv sync --locked) + hooks de pre-commit
 make data DATA_SRC="ruta/al/zip"        # copia los 3 CSV a data/raw/ y verifica sus hashes
-make pipeline                           # todas las etapas, de calidad a insights (~25 min)
+make pipeline                           # todas las etapas, de calidad a insights (~25–35 min)
 make app                                # tablero en http://127.0.0.1:8501
 ```
 
@@ -52,10 +52,10 @@ make app                                # tablero en http://127.0.0.1:8501
 | Etapa | Comando suelto | Tiempo aprox. | Escribe |
 |---|---|---|---|
 | Contratos y calidad | `make calidad` | segundos | `data/interim/panel.parquet`, `artifacts/calidad/` |
-| EDA (marimo) | `make eda` | ~1 min | `reports/eda.html`, `artifacts/eda/` |
-| Backtest | `make backtest` | ~19 min | `artifacts/backtest/` y MLflow |
+| EDA (marimo) | `make eda` | segundos | `reports/eda.html`, `artifacts/eda/` |
+| Backtest | `make backtest` | ~20–26 min | `artifacts/backtest/` y MLflow |
 | Selección | `make seleccion` | segundos | `artifacts/modelos/seleccion.json` |
-| Calibración | `make calibracion` | ~4 min | `artifacts/backtest/calibracion.*` |
+| Calibración | `make calibracion` | ~4–6 min | `artifacts/backtest/calibracion.*` |
 | Decisión | `make decision` | segundos | `artifacts/decision/impacto.json` |
 | Drift | `make drift` | ~15 s | `artifacts/drift/monitor.json` |
 | Promociones | `make causal` | ~20 s | `artifacts/causal/promociones.json` |
@@ -74,7 +74,7 @@ Requisitos: Docker con Compose. Los volúmenes comparten `data/`, `artifacts/` e
 ```bash
 docker compose build
 docker compose run --rm -v "$PWD/ruta/al/zip:/tmp/datos.zip:ro" pipeline data --src /tmp/datos.zip
-docker compose run --rm pipeline        # todas las etapas
+docker compose run --rm pipeline        # todas las etapas (~40 min la primera vez)
 docker compose up app mcp mlflow        # tablero :8501, MCP por HTTP :8765, MLflow :5000
 ```
 

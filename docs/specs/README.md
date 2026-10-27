@@ -15,7 +15,7 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | [E7](E7.md) | Servidor MCP, agentes y validador | cerrada |
 | [E8](E8.md) | Tablero | cerrada |
 | [E9](E9.md) | Empaquetado y documentación | cerrada |
-| E10 | Ensayo en limpio y publicación | pendiente |
+| [E10](E10.md) | Ensayo en limpio | cerrada |
 | E11 | `PROCESS.md` y contenido de la entrega (lo decide el usuario) | cerrada |
 
 Las specs de E2 en adelante se escriben al empezar cada etapa, a partir del plan.

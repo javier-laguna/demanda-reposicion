@@ -372,3 +372,18 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
     También sobrevivían 4 de 18 mutaciones.
 - **Qué enseñó:** el `.gitignore` y el `.dockerignore` son dos listas distintas de lo que no debe salir de la máquina,
   y hay que revisarlas por separado.
+
+### E10 · Ensayo en limpio
+
+- **Qué se hizo:**
+  - dos clones nuevos del repo, sin ambiente, datos, artefactos ni `.env`, siguiendo el README al pie de la letra:
+    uno por uv + make y otro por Docker;
+  - un barrido de seguridad de todo el historial.
+- **Resultado:**
+  - **las dos rutas terminaron sin pasos fuera del README;**
+  - en macOS, los 9 artefactos son idénticos byte a byte a los del repo de desarrollo;
+  - en Linux (Docker), las cifras principales son idénticas y la caché de insights sigue valiendo;
+  - el barrido no encontró secretos ni datos;
+  - el único ajuste al README fueron los tiempos, que se actualizaron a lo medido.
+- **Cómo se usó la IA:** Claude Code corrió el ensayo y el barrido, con un script propio que compara las cifras de
+  cada clon contra el repo de desarrollo.
