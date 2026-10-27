@@ -19,9 +19,10 @@ jobs:
       - run: make validate
       - run: uv run pre-commit run --all-files --show-diff-on-failure
       # Barrido de secretos sobre todo el historial (el hook de pre-commit solo ve los cambios)
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks git . --no-banner --redact
 
   # Solo comprueba que la imagen construye; no se publica en ningún registro
   docker:
