@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup data calidad eda ajuste backtest seleccion lint format types test validate docker-build up
+.PHONY: help setup data calidad eda ajuste backtest seleccion calibracion decision drift lint format types test validate docker-build up
 
 DATA_SRC ?=
 
@@ -27,6 +27,15 @@ backtest:  ## backtest de origen rodante: artifacts/backtest/ y un run de MLflow
 
 seleccion:  ## regla de campeón sobre el backtest: artifacts/modelos/seleccion.json
 	uv run demanda seleccion
+
+calibracion:  ## campeón y retador en orígenes previos al backtest: artifacts/backtest/calibracion.parquet
+	uv run demanda calibracion
+
+decision:  ## newsvendor: políticas de reposición y su impacto, artifacts/decision/impacto.json
+	uv run demanda decision
+
+drift:  ## monitor de drift semana a semana: artifacts/drift/monitor.json
+	uv run demanda drift
 
 lint:  ## ruff: lint y formato (sin modificar)
 	uv run ruff check .

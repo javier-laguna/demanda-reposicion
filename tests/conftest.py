@@ -1,16 +1,18 @@
 """Datos sintéticos con la misma forma que los reales. Los tests nunca leen `data/raw/`."""
 
+import json
 from datetime import date, timedelta
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
 
-from demanda.backtest.protocolo import CONOCIDAS, DE_LA_SENAL
+from demanda.backtest.protocolo import CONOCIDAS, DE_LA_SENAL, Protocolo, ultima_fecha
 from demanda.datos import panel
-from demanda.datos.contratos import FORMATOS, NSE, REGIONES, SERIE, Tablas
+from demanda.datos.contratos import CATEGORIAS, FORMATOS, NSE, REGIONES, SERIE, Tablas
 from demanda.modelos import chronos2
 
 INICIO = date(2023, 1, 1)
@@ -204,3 +206,68 @@ def chronos_sin_descargas(monkeypatch):
 def doble_chronos():
     """La clase del doble, para las pruebas que revisan cómo se llama al pipeline."""
     return PipelineDoble
+
+
+@pytest.fixture(scope="session")
+def panel_monitor() -> pl.DataFrame:
+    """Panel de 20 tiendas × 6 categorías × 70 días para el monitor: cada región tiene 4 tiendas y cada
+    segmento, cientos de celdas por semana."""
+    return panel.construir(generar(n_tiendas=20, categorias=CATEGORIAS, dias=70))
+
+
+class ArtefactosE5(NamedTuple):
+    panel: Path
+    reporte: Path
+    pronosticos: Path
+    metricas: Path
+    seleccion: Path
+    calibracion: Path
+
+
+@pytest.fixture(scope="session")
+def artefactos_e5(tmp_path_factory) -> ArtefactosE5:
+    """El pipeline sintético hasta la calibración, con lo que leen `decision` y `drift`: un panel de 112 días
+    (del 2023-01-01 al 2023-04-22), un backtest de 4 cortes con el sistema actual y la MA7, su selección y la
+    calibración en los 2 orígenes previos (2023-03-11 y 03-18).
+
+    Los cortes tienen los cuatro eventos: 03-25 es `resto`, 04-01 tiene un Buen Fin el 04-03, 04-08 es la
+    semana posterior y 04-15 tiene un día de temporada navideña el 04-20."""
+    from demanda.backtest import bucle, calibracion, segmentos
+    from demanda.modelos import Contexto, crear
+    from demanda.seleccion import campeon
+
+    carpeta = tmp_path_factory.mktemp("e5")
+    rutas = ArtefactosE5(
+        carpeta / "panel.parquet",
+        carpeta / "reporte.json",
+        carpeta / "pronosticos.parquet",
+        carpeta / "metricas.json",
+        carpeta / "seleccion.json",
+        carpeta / "calibracion.parquet",
+    )
+    p = panel.construir(generar(n_tiendas=10, categorias=CATEGORIAS, dias=112, semilla=1)).with_columns(
+        (pl.col("date") == date(2023, 4, 3)).alias("is_buen_fin"),
+        (pl.col("date") == date(2023, 4, 20)).alias("is_navidad_season"),
+    )
+    p.write_parquet(rutas.panel)
+    rutas.reporte.write_text(json.dumps({"fuga_replenishment_signal": {"factor": 0.53}}))
+
+    protocolo = Protocolo(n_cortes=4)
+    modelos = crear(Contexto(factor_senal=0.53), ["sistema_actual", "ma7"])
+    resultado = bucle.correr(p, modelos, protocolo)
+    resultado.pronosticos.write_parquet(rutas.pronosticos)
+    metricas = {
+        "protocolo": {
+            "horizonte": protocolo.horizonte,
+            "origenes": [str(o) for o in protocolo.origenes(ultima_fecha(p))],
+            "modelos": list(modelos),
+            "evento_por_corte": segmentos.evento_por_corte(resultado, p, protocolo.horizonte),
+        },
+        "segmentos": segmentos.tabla(resultado, p, protocolo, list(modelos)).to_dicts(),
+    }
+    rutas.metricas.write_text(json.dumps(metricas))
+    campeon.ejecutar(rutas.metricas, rutas.pronosticos, rutas.seleccion)
+    calibracion.ejecutar(
+        rutas.panel, rutas.reporte, rutas.seleccion, rutas.calibracion, protocolo=protocolo, n_origenes=2
+    )
+    return rutas

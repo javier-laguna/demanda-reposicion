@@ -77,7 +77,7 @@ def _supuestos(horizonte: int) -> list[str]:
     ]
 
 
-def _verificar_malla(panel: pl.DataFrame) -> None:
+def verificar_malla(panel: pl.DataFrame) -> None:
     """Los desplazamientos por serie del backtest y de las features suponen la malla completa."""
     if panel.height != panel["date"].n_unique() * panel.select(SERIE).n_unique():
         raise ValueError("el panel no es la malla completa; corre `demanda calidad`")
@@ -111,7 +111,7 @@ def _descripcion(modelo: Modelo) -> str:
     return next(iter((type(modelo).__doc__ or "").strip().splitlines()), "")
 
 
-def _cerrar(modelos: Mapping[str, Modelo]) -> None:
+def cerrar_modelos(modelos: Mapping[str, Modelo]) -> None:
     """Libera lo que los modelos tengan abierto, como el proceso de Chronos-2."""
     for modelo in modelos.values():
         cerrar = getattr(modelo, "cerrar", None)
@@ -143,7 +143,7 @@ def ejecutar(
     """
     protocolo = protocolo or Protocolo()
     panel = pl.read_parquet(panel_path).sort([*SERIE, "date"])
-    _verificar_malla(panel)
+    verificar_malla(panel)
     reporte = json.loads(reporte_path.read_text())
     resumen = json.loads(resumen_path.read_text()) if resumen_path.exists() else None
     factor = reporte["fuga_replenishment_signal"]["factor"]
@@ -152,7 +152,7 @@ def ejecutar(
     try:
         resultado = bucle.correr(panel, elegidos, protocolo, progreso)
     finally:
-        _cerrar(elegidos)
+        cerrar_modelos(elegidos)
     tabla = segmentos.tabla(resultado, panel, protocolo, list(elegidos))
     origenes = protocolo.origenes(ultima_fecha(panel))
 

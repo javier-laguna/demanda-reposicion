@@ -19,7 +19,7 @@ que documente el proceso y el uso de IA.
 
 El diagrama está en `.archify/` (el HTML de la carpeta más reciente).
 
-**Plan y estado:** `docs/specs/README.md` tiene la tabla de etapas (E0–E10) y el protocolo de cierre. Cada etapa
+**Plan y estado:** `docs/specs/README.md` tiene la tabla de etapas (E0–E11) y el protocolo de cierre. Cada etapa
 tiene su spec en `docs/specs/E<n>.md`. **Al empezar o reanudar, leer esos dos archivos antes de tocar código.**
 
 ## Comandos
@@ -34,6 +34,9 @@ make backtest                       # 17 cortes × 6 modelos → artifacts/backt
 uv run demanda backtest --modelos sistema_actual,lightgbm   # subconjunto, para desarrollar
 make seleccion                      # Diebold-Mariano + regla de campeón → artifacts/modelos/seleccion.json (segundos)
 make ajuste                         # rejilla de LightGBM en orígenes previos al backtest (~4 min; no hace falta para correr)
+make calibracion                    # campeón y retador en 8 orígenes previos → artifacts/backtest/calibracion.parquet (~4 min)
+make decision                       # newsvendor: 3 políticas, impacto y sensibilidad → artifacts/decision/impacto.json (segundos)
+make drift                          # monitor semana a semana y drift inyectado → artifacts/drift/monitor.json (~15 s)
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
@@ -148,3 +151,29 @@ que las usa.
     17 cortes.
   - Chronos-2 sin entrenar da 23.3 %, con un sesgo de −14 %.
   - Los intervalos del 80 % de los dos cubren solo el 67–69 %.
+
+## Decisión y drift
+
+- **Calibración** (`backtest/calibracion.py`): el campeón y el retador de `seleccion.json` en los 8 orígenes previos
+  al backtest (los del ajuste). El retador es el de menor WAPE semanal global que no es el campeón.
+  - `calibracion.json` guarda los hashes de su fuente;
+  - `decision` y `drift` fallan si la calibración es de otra corrida.
+- **Newsvendor** (`decision/`):
+  - el nivel objetivo semanal es S = Σŷ × q, donde q es el cuantil ponderado (peso Σŷ) de Σy / Σŷ en la fracción
+    crítica de la categoría;
+  - la ventana es expansiva: las 8 semanas de calibración más los cortes previos del backtest **con evento `resto`**.
+    Nunca mira el corte que decide;
+  - los márgenes y costos de mantener son supuestos ilustrativos en `decision/supuestos.py`; el precio sale de los
+    datos.
+- **Monitor** (`drift/`):
+  - es una función pura de (panel, pronósticos, semana); la inyección de drift solo cambia el panel;
+  - la referencia son los 56 días que terminan en T, sin días especiales;
+  - tiene tres capas: calidad, entradas y desempeño. Las alertas de nivel, ticket y desempeño son «esperadas» si la
+    semana tiene un día especial o un evento del backtest.
+- **Resultado de E5** (`docs/specs/E5.md`):
+  - el newsvendor sobre el pronóstico del sistema actual cuesta 40 % menos que reponer al pronóstico puntual
+    (p = 0.019);
+  - LightGBM baja otro 9 %, sin significancia (p = 0.20), y empata en semanas normales;
+  - el costo está en los eventos (Buen Fin: 114 de 213 M);
+  - el monitor detecta los tres escenarios inyectados y la falla real de STR_055, pero su chequeo de nivel confunde
+    la estacionalidad anual con drift: en noviembre y enero alerta en todos los segmentos.

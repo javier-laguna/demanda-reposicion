@@ -10,7 +10,7 @@ resultado. Las etapas están acotadas para que cada una quepa en una ventana de 
 | [E2](E2.md) | EDA reproducible (marimo) | cerrada |
 | [E3](E3.md) | Features, backtest y baselines | cerrada |
 | [E4](E4.md) | Modelos (LightGBM, Chronos-2) y validación robusta | cerrada |
-| E5 | Monitor de drift y reglas de decisión | pendiente |
+| [E5](E5.md) | Monitor de drift y reglas de decisión | cerrada |
 | E6 | Experimento de promociones | pendiente |
 | E7 | Servidor MCP, agentes y validador | pendiente |
 | E8 | Tablero | pendiente |

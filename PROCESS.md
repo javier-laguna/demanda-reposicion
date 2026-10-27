@@ -193,3 +193,39 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
   - Fijar la regla antes de ver resultados importó. Un 7 pp de mejora es tentador, pero viene de tres semanas
     excepcionales, y con 17 cortes no se distingue del ruido.
   - El resultado honesto es dejar a LightGBM como retador y medir el valor del cambio en E5, no declararlo ganador.
+
+### E5 · Monitor de drift y reglas de decisión
+
+- **Qué se hizo:**
+  - una calibración del campeón y el retador en 8 semanas previas al backtest;
+  - un newsvendor por categoría, con cuantiles de servicio tomados de los errores semanales de semanas pasadas, y
+    tres políticas: puntual, newsvendor con el sistema actual y newsvendor con LightGBM;
+  - un monitor de drift en tres capas (calidad, entradas y desempeño), que separa lo esperado por calendario de lo
+    inesperado, vigila al retador y traduce cada alerta en una recomendación;
+  - la validación del monitor con tres escenarios de drift inyectado y una prueba de potencia.
+- **Resultado:**
+  - el newsvendor con el pronóstico del sistema actual cuesta 40 % menos que reponer al pronóstico puntual
+    (p = 0.019). Cambiar el pronóstico por LightGBM baja otro 9 %, pero sin significancia (p = 0.20);
+  - el monitor detecta los tres escenarios y la falla real de captura de una tienda;
+  - su chequeo de nivel confunde la estacionalidad anual con drift: alerta en todos los segmentos en noviembre y
+    enero.
+- **Cómo se usó la IA:**
+  - **Claude Code escribió la spec**, con los umbrales, las reglas, los supuestos de costo y los escenarios,
+    **antes de correr nada sobre las semanas del backtest**.
+    - Para elegir los umbrales prototipó el monitor solo sobre las 35 semanas anteriores. La spec lo declara, junto
+      con lo que mostró.
+    - La spec también anticipó una limitación: alertas de nivel en enero por la estacionalidad.
+  - **La implementación la hizo un agente general** con las instrucciones de `forecast-engineer`. No cambió
+    umbrales ni reglas; las precisiones quedaron en la spec.
+  - **La verificación no usó el código del agente.** Con dos scripts propios, escritos desde la spec, se
+    recalcularon el newsvendor completo y las alertas del monitor. Coinciden.
+  - **La revisión la hizo otro agente** con las instrucciones de `reviewer`. No encontró errores de cálculo.
+    - Sí encontró que 16 de 42 mutaciones sobrevivían. Entre ellas, una vigilancia del retador que podía mirar
+      cortes posteriores sin que ninguna prueba fallara.
+    - El implementador agregó las pruebas. Ahora mueren 48 de 50 mutaciones, y las 2 restantes son equivalentes.
+- **Qué enseñó:**
+  - La decisión pesa más que el modelo. El colchón de servicio vale 40 % del costo con el pronóstico de hoy; el mejor
+    modelo agrega 9 %, y solo en las semanas con evento.
+  - Pre-registrar también expone los errores de diseño de la spec. La referencia móvil de 56 días no distingue la
+    estacionalidad anual, y alertó en noviembre, cosa que la spec no anticipó. Queda documentado y no se ajustó
+    mirando esas semanas.

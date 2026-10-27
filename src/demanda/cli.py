@@ -171,6 +171,122 @@ def _seleccion(args: argparse.Namespace) -> None:
     print(f"escrito: {salida}")
 
 
+def _requeridos(*rutas: tuple[Path, str]) -> None:
+    """Falla con un mensaje claro si falta un artefacto previo: cada ruta va con el comando que la escribe."""
+    for ruta, comando in rutas:
+        if not ruta.exists():
+            raise FileNotFoundError(f"no existe {ruta}; corre antes `demanda {comando}`")
+
+
+def _artefactos_e4() -> tuple[Path, Path, Path]:
+    """Los pronósticos y las métricas del backtest, y la selección del campeón."""
+    cfg = get_config()
+    backtest = cfg.artifacts_dir / "backtest"
+    rutas = (
+        backtest / "pronosticos.parquet",
+        backtest / "metricas.json",
+        cfg.artifacts_dir / "modelos" / "seleccion.json",
+    )
+    _requeridos((rutas[0], "backtest"), (rutas[1], "backtest"), (rutas[2], "seleccion"))
+    return rutas
+
+
+def _calibracion(args: argparse.Namespace) -> None:
+    from demanda.backtest import calibracion
+
+    cfg = get_config()
+    panel_path, reporte_path = _paneles()
+    _, _, seleccion_path = _artefactos_e4()
+    salida = cfg.artifacts_dir / "backtest" / "calibracion.parquet"
+    p = calibracion.ejecutar(panel_path, reporte_path, seleccion_path, salida, n_jobs=-1, progreso=_progreso)
+    origenes = p["origen"].unique().sort()
+    print(f"modelos: {', '.join(p['modelo'].unique(maintain_order=True))}")
+    print(f"orígenes: {origenes[0]} a {origenes[-1]} ({origenes.len()})")
+    print(f"escrito: {salida} y {calibracion.registro(salida)}")
+
+
+def _calibracion_previa() -> Path:
+    ruta = get_config().artifacts_dir / "backtest" / "calibracion.parquet"
+    _requeridos((ruta, "calibracion"))
+    return ruta
+
+
+def _decision(args: argparse.Namespace) -> None:
+    from demanda.decision import etapa
+
+    cfg = get_config()
+    panel_path, _ = _paneles()
+    pronosticos_path, metricas_path, seleccion_path = _artefactos_e4()
+    salida = cfg.artifacts_dir / "decision" / "impacto.json"
+    r = etapa.ejecutar(
+        pronosticos_path, metricas_path, seleccion_path, _calibracion_previa(), panel_path, salida
+    )
+    print(f"campeón: {r['campeon']} · retador: {r['retador']}")
+    columnas = ("costo", "sobreinv.", "quiebre", "fill rate", "servicio")
+    for segmento, nivel in (("global", "global"), ("evento", "resto")):
+        print(f"{segmento}={nivel}")
+        print(f"  {'política':<28}" + "".join(f"{c:>15}" for c in columnas))
+        for f in r["impacto"]:
+            if (f["segmento"], f["nivel"]) != (segmento, nivel):
+                continue
+            celdas = (
+                f"{f['costo']:,.0f}",
+                _pct(f["sobreinventario_pct"]),
+                _pct(f["quiebre_pct"]),
+                _pct(f["fill_rate_pct"]),
+                _pct(f["nivel_servicio_pct"]),
+            )
+            print(f"  {f['politica']:<28}" + "".join(f"{c:>15}" for c in celdas))
+    print("Diebold-Mariano sobre el costo por corte:")
+    for p in r["pruebas_costo"]:
+        valor_p = "—" if p["p_valor"] is None else f"{p['p_valor']:.4f}"
+        print(
+            f"  {p['a']:<26} vs {p['b']:<26} {p['segmento']:<7} n={p['n_cortes']:<3} "
+            f"Δ {_pct(p['diferencia_pct'], signo=True)}  p = {valor_p}"
+        )
+    print(f"orden se mantiene en la sensibilidad: {'sí' if r['sensibilidad']['orden_se_mantiene'] else 'no'}")
+    print(r["conclusion"])
+    print(f"escrito: {salida}")
+
+
+def _drift(args: argparse.Namespace) -> None:
+    from demanda.drift import etapa
+
+    cfg = get_config()
+    panel_path, _ = _paneles()
+    pronosticos_path, metricas_path, seleccion_path = _artefactos_e4()
+    salida = cfg.artifacts_dir / "drift" / "monitor.json"
+    r = etapa.ejecutar(
+        panel_path, pronosticos_path, metricas_path, seleccion_path, _calibracion_previa(), salida
+    )
+    print("falsas alarmas en las semanas de calibración (alertas inesperadas por chequeo):")
+    print("  " + " · ".join(f"{c} {n}" for c, n in r["resumen"]["falsas_alarmas_calibracion"].items()))
+    print("semanas del backtest:")
+    for s in r["semanas"]:
+        if s["periodo"] != "backtest":
+            continue
+        inesperadas = sum(
+            a["severidad"] == "alerta" and a["clasificacion"] == "inesperada" for a in s["alertas"]
+        )
+        esperadas = sum(a["severidad"] == "alerta" and a["clasificacion"] == "esperada" for a in s["alertas"])
+        codigos = ", ".join(rec["codigo"] for rec in s["recomendaciones"])
+        print(
+            f"  {s['origen']} {s['evento']:<14} inesperadas {inesperadas:>3} · esperadas {esperadas:>3}"
+            f" · {codigos}"
+        )
+    v = r["vigilancia_retador"]
+    final = v["final"] or {}
+    print(
+        f"retador {r['retador']}: DM acumulada p = {final.get('p_valor', '—')} al último corte "
+        f"(mínima {(v['minima'] or {}).get('p_valor', '—')}); coincide con seleccion.json: "
+        f"{v['coincide_con_seleccion']}"
+    )
+    val = r["validacion"]
+    for e in val["escenarios"]:
+        print(f"  {e['escenario']:<17} {e['origen']} detectado: {'sí' if e['detectado'] else 'no'}")
+    print(f"escrito: {salida}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="demanda")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -196,6 +312,21 @@ def main(argv: list[str] | None = None) -> None:
 
     p_seleccion = sub.add_parser("seleccion", help="aplica la regla de campeón a las salidas del backtest")
     p_seleccion.set_defaults(func=_seleccion)
+
+    p_calibracion = sub.add_parser(
+        "calibracion", help="pronostica con el campeón y el retador en los orígenes previos al backtest"
+    )
+    p_calibracion.set_defaults(func=_calibracion)
+
+    p_decision = sub.add_parser(
+        "decision", help="newsvendor: niveles de reposición y su impacto por política"
+    )
+    p_decision.set_defaults(func=_decision)
+
+    p_drift = sub.add_parser(
+        "drift", help="monitor de drift semana a semana, vigilancia del retador y validación"
+    )
+    p_drift.set_defaults(func=_drift)
 
     args = parser.parse_args(argv)
     try:

@@ -346,6 +346,29 @@ def seleccionar(metricas: Mapping[str, Any], pronosticos: pl.DataFrame, regla: R
     }
 
 
+def campeon_y_retador(seleccion: Mapping[str, Any]) -> tuple[str, str]:
+    """El campeón de `seleccion.json` y su retador: el modelo distinto del campeón con menor WAPE semanal
+    global. Si empatan, el primero del registro. E5 decide y vigila con estos dos."""
+    campeon = seleccion["campeon"]
+    orden = list(seleccion["modelos"])
+    otros = [m for m in orden if m != campeon]
+    if not otros:
+        raise ValueError("seleccion.json no tiene retadores")
+    wape = {m: _redondeo(seleccion["modelos"][m]["wape_semanal_global_pct"]) for m in otros}
+    return campeon, min(otros, key=lambda m: (wape[m], orden.index(m)))
+
+
+def verificar_fuente(seleccion: Mapping[str, Any], metricas_path: Path, pronosticos_path: Path) -> None:
+    """`seleccion.json` debe salir de estas `metricas.json` y `pronosticos.parquet`: sus hashes lo dicen."""
+    fuente = seleccion.get("fuente") or {}
+    if fuente.get("metricas_sha256") != sha256(metricas_path) or fuente.get("pronosticos_sha256") != sha256(
+        pronosticos_path
+    ):
+        raise ValueError(
+            "seleccion.json no corresponde a las salidas del backtest; corre `demanda seleccion`"
+        )
+
+
 def ejecutar(
     metricas_path: Path, pronosticos_path: Path, salida_path: Path, regla: Regla | None = None
 ) -> dict[str, Any]:

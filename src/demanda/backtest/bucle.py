@@ -1,7 +1,8 @@
 """El bucle por corte y modelo. Cada modelo recibe solo la historia y el futuro del corte."""
 
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
+from datetime import date
 from typing import NamedTuple
 
 import polars as pl
@@ -47,11 +48,16 @@ def correr(
     modelos: Mapping[str, Modelo],
     protocolo: Protocolo,
     progreso: Callable[[str], None] | None = None,
+    origenes: Sequence[date] | None = None,
 ) -> Resultado:
-    """Cada modelo en cada corte. El progreso reporta los segundos por modelo, que no van a las salidas."""
+    """Cada modelo en cada corte. El progreso reporta los segundos por modelo, que no van a las salidas.
+
+    Sin `origenes`, los cortes son los del protocolo; con ellos, esos orígenes con el mismo `separar` y el
+    mismo horizonte (la calibración de E5).
+    """
     pronosticos, escalas = [], []
     total = dict.fromkeys(modelos, 0.0)
-    for origen in protocolo.origenes(ultima_fecha(panel)):
+    for origen in protocolo.origenes(ultima_fecha(panel)) if origenes is None else origenes:
         corte = separar(panel, origen, protocolo.horizonte)
         escalas.append(escala_mase(corte.historia).with_columns(pl.lit(origen).alias("origen")))
         segundos = {}
