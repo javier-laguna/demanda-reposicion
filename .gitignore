@@ -41,3 +41,7 @@ __marimo__/
 
 # Notas de trabajo locales: no forman parte de la entrega
 notas/
+
+# Presentación: dependencias y salida de Slidev
+presentacion/node_modules/
+presentacion/dist/

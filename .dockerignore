@@ -21,3 +21,5 @@ tests
 .archify/**/*.delivery.json
 .archify/**/visual-check
 .archify/**/review-*
+# La presentación no entra a la imagen (su node_modules pesa ~570 MB)
+presentacion

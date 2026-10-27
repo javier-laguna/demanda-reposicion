@@ -46,6 +46,7 @@ make app                            # tablero Streamlit en http://127.0.0.1:8501
 docker compose build && docker compose run --rm pipeline   # lo mismo en Docker; luego docker compose up app mcp mlflow
 uv run mlflow ui --backend-store-uri sqlite:///artifacts/mlflow.db   # ver los runs
 make validate                       # ruff (lint + formato) + pyrefly + pytest; requisito antes de cada commit
+cd presentacion && npm ci && npm run dev   # la presentación (Slidev, Node ≥ 22.12); npm run export -- --output demanda-reposicion.pdf
 uv run pytest tests/test_fuente.py::test_prepara_desde_zip   # un test
 uv run demanda --help               # CLI del pipeline; cada etapa agrega su comando
 ```
@@ -56,8 +57,9 @@ que las usa.
 ## Reglas del repo
 
 - **Los datos nunca se versionan.** `data/` está en `.gitignore`, salvo `data/manifest.sha256`, y un hook de
-  pre-commit bloquea `*.csv`, `*.parquet` y `*.zip`. Lo mismo para `artifacts/` y `reports/`. Lo único derivado de
-  los datos que se versiona es `insights/cache.json`: conclusiones agregadas por segmento, nunca filas ni series.
+  pre-commit bloquea `*.csv`, `*.parquet` y `*.zip`. Lo mismo para `artifacts/` y `reports/`. Lo derivado de los
+  datos que se versiona es `insights/cache.json` (conclusiones agregadas por segmento, nunca filas ni series) y la
+  presentación de `presentacion/`, con cifras de resultados y capturas del tablero.
 - **Secretos:** solo en `.env` (gitignored; plantilla en `.env.example`) y leídos como `SecretStr` en
   `src/demanda/config.py`. gitleaks corre en pre-commit y en CI. CI corre sin key.
 - **Tests sin datos reales:** usan fixtures sintéticos generados en el test.

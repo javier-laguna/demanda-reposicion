@@ -17,6 +17,10 @@ La respuesta tiene cinco piezas, todas reproducibles con un comando:
 El proceso, incluido cómo se usó la IA, está en [`PROCESS.md`](PROCESS.md). El plan, las specs pre-registradas y el
 resultado de cada etapa están en [`docs/specs/`](docs/specs/README.md).
 
+**Para verlo sin correr nada:** la presentación [`presentacion/demanda-reposicion.pdf`](presentacion/demanda-reposicion.pdf)
+resume el proyecto en 32 diapositivas, con los resultados y capturas del tablero ([más abajo](#presentación), qué
+tiene y cómo se hizo).
+
 ## Resultados principales
 
 | Pregunta | Respuesta | Detalle |
@@ -126,8 +130,39 @@ El servidor MCP también sirve a clientes externos: `make mcp` (stdio) o `uv run
 ├── tests/             pruebas con datos sintéticos; CI nunca ve datos reales
 ├── insights/          la caché versionada de la capa de agentes
 ├── docs/              specs por etapa, model card, despliegue y diseño del A/B
+├── presentacion/      la presentación en Slidev: fuente, capturas y PDF
 ├── .archify/          diagrama de arquitectura (se ve en la página Arquitectura del tablero)
 └── .claude/           subagentes de desarrollo (opcional, ver abajo)
+```
+
+## Presentación
+
+[`presentacion/demanda-reposicion.pdf`](presentacion/demanda-reposicion.pdf) cuenta el proyecto en 32 diapositivas:
+
+- **qué se resolvió:** el problema elegido, las seis preguntas con su respuesta y la arquitectura;
+- **una sección por pieza:** datos, pronóstico, decisión y drift, promociones y capa de agentes, cada una con sus
+  hallazgos y cifras;
+- **capturas del tablero,** marcadas «Tablero › página», junto al hallazgo que respaldan;
+- **el proceso:** el ciclo por etapa con verificación independiente, la reproducibilidad, los límites y el paso a
+  producción.
+
+Cómo se hizo:
+
+- Con [Slidev](https://sli.dev) 53. La fuente es `presentacion/slides.md`. Las gráficas propias (WAPE por modelo,
+  costo por política y efecto de las promociones) son componentes Vue en `presentacion/components/`, con las cifras
+  tomadas de los artefactos.
+- Las capturas de `presentacion/public/` salen del tablero corriendo en local (`make app`), tomadas con Playwright en
+  tema claro. Las de arquitectura salen del diagrama de `.archify/`.
+- La armó Claude Code con la skill dataviz, que valida la paleta contra daltonismo en tema claro y oscuro.
+
+Para verla o volver a exportarla (Node 22.12 o más):
+
+```bash
+cd presentacion
+npm ci
+npm run dev                                         # se abre en el navegador, en http://localhost:3030
+npx playwright install chromium                     # una vez, para exportar
+npm run export -- --output demanda-reposicion.pdf
 ```
 
 ## Sobre `.claude/`

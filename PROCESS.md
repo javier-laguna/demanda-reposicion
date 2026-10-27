@@ -94,7 +94,8 @@ La IA aparece en dos lugares distintos, y conviene no confundirlos:
 
 ### Otras herramientas
 
-- **Skills:** archify, para los diagramas de arquitectura, y claude-api, para elegir el modelo y sus parámetros en E7.
+- **Skills:** archify, para los diagramas de arquitectura; claude-api, para elegir el modelo y sus parámetros en E7, y
+  dataviz, para las gráficas de la presentación.
 - **Tareas en segundo plano** para lo que tarda: el backtest (~19 min), el pipeline completo y los agentes. Claude Code
   sigue trabajando y recibe un aviso cuando terminan.
 - **La memoria persistente de Claude Code** guardó preferencias que no pertenecen al repo, como que el contenido de

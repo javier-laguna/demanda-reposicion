@@ -4,6 +4,8 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=1000"]
+        # El PDF de la presentación pesa ~2 MB
+        exclude: ^presentacion/demanda-reposicion\.pdf$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
